@@ -15,6 +15,11 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 53117,
     strictPort: true,
+    // Nunca observar el build de Rust: Cargo reescribe estos archivos
+    // constantemente y satura el watcher de Node en Windows (EBUSY).
+    watch: {
+      ignored: ["**/src-tauri/**"],
+    },
   },
   envPrefix: ["VITE_", "TAURI_"],
   build: {
