@@ -1,0 +1,38 @@
+[
+  {
+    "code": "PF1",
+    "title": "¿Cómo funciona el mundo y por qué cambia?",
+    "description": "Economía, historia, instituciones, cultura, psicología, tecnología, geopolítica y coordinación social.",
+    "sort_order": 1
+  },
+  {
+    "code": "PF2",
+    "title": "¿Cómo se crea, preserva o destruye valor?",
+    "description": "Empresa, emprendimiento, innovación, productividad, modelos de negocio, ventajas competitivas y capital humano.",
+    "sort_order": 2
+  },
+  {
+    "code": "PF3",
+    "title": "¿Cómo asignar capital de la mejor manera posible?",
+    "description": "Contabilidad, valuación, acciones, bonos, derivados, carteras, proyectos, liquidez y finanzas corporativas.",
+    "sort_order": 3
+  },
+  {
+    "code": "PF4",
+    "title": "¿Cómo tomar decisiones bajo incertidumbre?",
+    "description": "Probabilidad, estadística, riesgo, sesgos, incentivos, teoría de decisión, escenarios y opcionalidad.",
+    "sort_order": 4
+  },
+  {
+    "code": "PF5",
+    "title": "¿Cómo construir organizaciones capaces de aprender y perdurar?",
+    "description": "Liderazgo, cultura, estrategia, procesos, equipos, gobierno, sucesión y adaptación.",
+    "sort_order": 5
+  },
+  {
+    "code": "PF6",
+    "title": "¿Cómo aprender y producir conocimiento continuamente?",
+    "description": "Investigación, lectura, conversación, escritura, documentación, programación, herramientas y enseñanza.",
+    "sort_order": 6
+  }
+]

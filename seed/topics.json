@@ -1,0 +1,53 @@
+[
+  { "subject_code": "MAT-PENSAR", "learning_stage_code": "ET1", "title": "Argumento, afirmación y evidencia" },
+  { "subject_code": "MAT-PENSAR", "learning_stage_code": "ET1", "title": "Causalidad, correlación y narrativa" },
+  { "subject_code": "MAT-PENSAR", "learning_stage_code": "ET1", "title": "Probabilidad y tasas base" },
+  { "subject_code": "MAT-PENSAR", "learning_stage_code": "ET1", "title": "Sesgos propios y calidad de decisión" },
+  { "subject_code": "MAT-PENSAR", "learning_stage_code": "ET1", "title": "Escenarios y condiciones de revisión" },
+
+  { "subject_code": "MAT-ECONOMIA", "learning_stage_code": "ET1", "title": "Formación de precios" },
+  { "subject_code": "MAT-ECONOMIA", "learning_stage_code": "ET1", "title": "Costo de oportunidad" },
+  { "subject_code": "MAT-ECONOMIA", "learning_stage_code": "ET1", "title": "Dinero, crédito e interés" },
+  { "subject_code": "MAT-ECONOMIA", "learning_stage_code": "ET1", "title": "Ahorro, inversión, inflación y tasas" },
+  { "subject_code": "MAT-ECONOMIA", "learning_stage_code": "ET1", "title": "Impuestos, subsidios y regulación" },
+
+  { "subject_code": "MAT-CONTABILIDAD", "learning_stage_code": "ET1", "title": "Balance, resultados y flujo de efectivo" },
+  { "subject_code": "MAT-CONTABILIDAD", "learning_stage_code": "ET1", "title": "Ganancia contable y caja" },
+  { "subject_code": "MAT-CONTABILIDAD", "learning_stage_code": "ET1", "title": "Liquidez, solvencia y capital de trabajo" },
+  { "subject_code": "MAT-CONTABILIDAD", "learning_stage_code": "ET1", "title": "Creación y captura de valor" },
+  { "subject_code": "MAT-CONTABILIDAD", "learning_stage_code": "ET1", "title": "Caso aplicado: YPF o Grupo Financiero Galicia" },
+
+  { "subject_code": "MAT-EMPRESA", "learning_stage_code": "ET2", "title": "Modelos de negocio y propuesta de valor" },
+  { "subject_code": "MAT-EMPRESA", "learning_stage_code": "ET2", "title": "Economías de escala y cuellos de botella" },
+  { "subject_code": "MAT-EMPRESA", "learning_stage_code": "ET2", "title": "Ventajas competitivas y su duración" },
+  { "subject_code": "MAT-EMPRESA", "learning_stage_code": "ET2", "title": "Retorno sobre el capital y reinversión" },
+  { "subject_code": "MAT-EMPRESA", "learning_stage_code": "ET2", "title": "Liderazgo, incentivos y cultura" },
+  { "subject_code": "MAT-EMPRESA", "learning_stage_code": "ET2", "title": "Análisis Empresarial Inicial (proyecto integrador)" },
+
+  { "subject_code": "MAT-FINANZAS", "learning_stage_code": "ET3", "title": "Interés, capitalización y valor presente" },
+  { "subject_code": "MAT-FINANZAS", "learning_stage_code": "ET3", "title": "Acciones: propiedad, dividendos y dilución" },
+  { "subject_code": "MAT-FINANZAS", "learning_stage_code": "ET3", "title": "Bonos: principal, cupón, duración y crédito" },
+  { "subject_code": "MAT-FINANZAS", "learning_stage_code": "ET3", "title": "CEDEARs: estructura y riesgo local" },
+  { "subject_code": "MAT-FINANZAS", "learning_stage_code": "ET3", "title": "Valuación: DCF, múltiplos y margen de seguridad" },
+
+  { "subject_code": "MAT-OPCIONES", "learning_stage_code": "ET4", "title": "Contrato, derecho y perfil de pago" },
+  { "subject_code": "MAT-OPCIONES", "learning_stage_code": "ET4", "title": "Prima, valor intrínseco y valor temporal" },
+  { "subject_code": "MAT-OPCIONES", "learning_stage_code": "ET4", "title": "Volatilidad histórica e implícita" },
+  { "subject_code": "MAT-OPCIONES", "learning_stage_code": "ET4", "title": "Griegas: delta, gamma, theta, vega" },
+  { "subject_code": "MAT-OPCIONES", "learning_stage_code": "ET4", "title": "Cadenas reales de Galicia y YPF" },
+  { "subject_code": "MAT-OPCIONES", "learning_stage_code": "ET4", "title": "Spreads verticales y comparación con acciones" },
+  { "subject_code": "MAT-OPCIONES", "learning_stage_code": "ET4", "title": "Tamaño de posición y riesgo de cartera" },
+
+  { "subject_code": "MAT-CARTERA", "learning_stage_code": "ET5", "title": "Objetivos, horizonte y liquidez" },
+  { "subject_code": "MAT-CARTERA", "learning_stage_code": "ET5", "title": "Diversificación, concentración y correlaciones" },
+  { "subject_code": "MAT-CARTERA", "learning_stage_code": "ET5", "title": "Criterios de entrada, seguimiento y salida" },
+  { "subject_code": "MAT-CARTERA", "learning_stage_code": "ET5", "title": "Política Personal de Asignación de Capital (proyecto)" },
+
+  { "subject_code": "MAT-GEOPOLITICA", "learning_stage_code": "ET6", "title": "Instituciones y régimen político" },
+  { "subject_code": "MAT-GEOPOLITICA", "learning_stage_code": "ET6", "title": "Sanciones, conflictos y cadenas productivas" },
+  { "subject_code": "MAT-GEOPOLITICA", "learning_stage_code": "ET6", "title": "Tecnologías que desplazan industrias" },
+
+  { "subject_code": "MAT-CORPORATIVAS", "learning_stage_code": "ET7", "title": "Tesorería y capital de trabajo" },
+  { "subject_code": "MAT-CORPORATIVAS", "learning_stage_code": "ET7", "title": "Estructura de capital y costo de capital" },
+  { "subject_code": "MAT-CORPORATIVAS", "learning_stage_code": "ET7", "title": "Política financiera empresarial (proyecto)" }
+]

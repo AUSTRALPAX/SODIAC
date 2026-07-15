@@ -1,0 +1,22 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# SODIAC: nunca versionar datos reales de usuario, backups locales ni el vault
+*.db
+*.sqlite
+*.sqlite3
+/backups/
+
+# Harness / tooling local state
+.claude/

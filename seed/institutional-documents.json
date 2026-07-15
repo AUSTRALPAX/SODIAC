@@ -1,0 +1,14 @@
+[
+  { "code": "IAC-CVPS-DF-001", "title": "Documento Fundacional", "doc_type": "fundacional", "status": "publicado", "version_label": "v1.0.0" },
+  { "code": "IAC-CVPS-CM-001", "title": "Compendio Maestro", "doc_type": "compendio", "status": "publicado", "version_label": "v1.0.0" },
+  { "code": "IAC-HRA-SE-001", "title": "Hoja de Ruta Académica y Sistema de Estudio", "doc_type": "operativo", "status": "publicado", "version_label": "v1.0.0" },
+  { "code": "IAC-CVPS-CP-01", "title": "Constitución Personal", "doc_type": "constitucion", "status": "borrador", "version_label": "v0.1" },
+  { "code": "IAC-CVPS-CG-02", "title": "Constitución de ChatGPT", "doc_type": "constitucion", "status": "borrador", "version_label": "v0.1" },
+  { "code": "IAC-CVPS-MC-03", "title": "Mapa Maestro de Competencias", "doc_type": "academico", "status": "borrador", "version_label": "v0.1" },
+  { "code": "IAC-CVPS-MD-04", "title": "Matriz de Diagnóstico", "doc_type": "academico", "status": "borrador", "version_label": "v0.1" },
+  { "code": "IAC-CVPS-PS-05", "title": "Plantilla de Sesión", "doc_type": "plantilla", "status": "borrador", "version_label": "v0.1" },
+  { "code": "IAC-CVPS-NC-06", "title": "Plantilla de Nota Conceptual", "doc_type": "plantilla", "status": "borrador", "version_label": "v0.1" },
+  { "code": "IAC-CVPS-BB-07", "title": "Base Bibliográfica Inicial", "doc_type": "bibliografia", "status": "borrador", "version_label": "v0.1" },
+  { "code": "IAC-CVPS-IL-08", "title": "Índice Provisional del Libro", "doc_type": "editorial", "status": "borrador", "version_label": "v0.1" },
+  { "code": "IAC-CVPS-M01-09", "title": "Primera Misión: Opciones Argentinas", "doc_type": "mision", "status": "borrador", "version_label": "v0.1" }
+]

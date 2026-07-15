@@ -1,0 +1,23 @@
+[
+  {
+    "code": "PROJ-MISION-01",
+    "title": "Primera Misión: Opciones Argentinas",
+    "project_type": "laboratorio",
+    "context_type": "simulacion",
+    "subject_code": "MAT-OPCIONES",
+    "fundamental_question_code": "PF3",
+    "description": "Sistema de operación y aprendizaje de opciones sobre Grupo Financiero Galicia y YPF: teoría, mercado local, Excel, simulación, gestión de riesgo, registro por lotes y producción escrita. Fuente: Compendio Maestro, documento 11 (Primera Misión v0.1). No implica operación financiera real.",
+    "closure_conditions": "Ver criterios de finalización de la Primera Misión (10 condiciones, incluyendo planilla utilizable, 3 casos simulados con revisión y documento técnico).",
+    "milestones": [
+      { "title": "Fase A — Arquitectura del instrumento" },
+      { "title": "Fase B — Formación del precio" },
+      { "title": "Fase C — Sensibilidades (griegas)" },
+      { "title": "Fase D — Estrategias" },
+      { "title": "Fase E — Mercado argentino" },
+      { "title": "Fase F — Excel y registro" },
+      { "title": "Fase G — Simulación" },
+      { "title": "Fase H — Operación controlada" },
+      { "title": "Fase I — Revisión y capítulo" }
+    ]
+  }
+]

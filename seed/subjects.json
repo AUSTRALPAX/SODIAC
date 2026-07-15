@@ -1,0 +1,11 @@
+[
+  { "code": "MAT-PENSAR", "fundamental_question_code": "PF4", "title": "Pensar y decidir", "description": "Argumentación, causalidad, probabilidad, sesgos, escenarios (Hoja de Ruta, Etapa 1, Línea A)." },
+  { "code": "MAT-ECONOMIA", "fundamental_question_code": "PF1", "title": "Economía y coordinación", "description": "Formación de precios, costo de oportunidad, dinero, crédito, interés, inflación (Hoja de Ruta, Etapa 1, Línea B)." },
+  { "code": "MAT-CONTABILIDAD", "fundamental_question_code": "PF3", "title": "Contabilidad y empresa", "description": "Balance, resultados, flujo de efectivo, liquidez, solvencia, creación de valor (Hoja de Ruta, Etapa 1, Línea C)." },
+  { "code": "MAT-EMPRESA", "fundamental_question_code": "PF2", "title": "Empresas y creación de valor", "description": "Modelos de negocio, ventajas competitivas, apalancamiento operativo, liderazgo (Hoja de Ruta, Etapa 2)." },
+  { "code": "MAT-FINANZAS", "fundamental_question_code": "PF3", "title": "Finanzas e instrumentos", "description": "Matemática financiera, acciones, bonos, CEDEARs, valuación (Hoja de Ruta, Etapa 3)." },
+  { "code": "MAT-OPCIONES", "fundamental_question_code": "PF3", "title": "Opciones argentinas", "description": "Primera misión aplicada: contrato, griegas, estrategias, mercado local (Hoja de Ruta, Etapa 4)." },
+  { "code": "MAT-CARTERA", "fundamental_question_code": "PF3", "title": "Asignación de capital y cartera", "description": "Objetivos, riesgo, diversificación, tesorería, mesa de dinero (Hoja de Ruta, Etapa 5)." },
+  { "code": "MAT-GEOPOLITICA", "fundamental_question_code": "PF1", "title": "Geopolítica, tecnología y tendencias", "description": "Instituciones, régimen político, sanciones, cadenas productivas, disrupción (Hoja de Ruta, Etapa 6)." },
+  { "code": "MAT-CORPORATIVAS", "fundamental_question_code": "PF3", "title": "Finanzas corporativas y dirección", "description": "Tesorería, estructura de capital, gobierno corporativo, M&A (Hoja de Ruta, Etapa 7)." }
+]

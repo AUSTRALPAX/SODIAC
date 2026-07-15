@@ -1,0 +1,10 @@
+[
+  { "code": "ET0", "title": "Puesta en marcha", "orientative_duration": "3 a 5 sesiones", "main_product": "Diagnóstico, prioridades y ruta inicial", "sort_order": 0 },
+  { "code": "ET1", "title": "Lenguaje básico de la realidad económica", "orientative_duration": "4 a 6 semanas", "main_product": "Base conectada en pensamiento, economía, contabilidad y empresa", "sort_order": 1 },
+  { "code": "ET2", "title": "Empresas y creación de valor", "orientative_duration": "4 a 8 semanas", "main_product": "Análisis empresarial inicial", "sort_order": 2 },
+  { "code": "ET3", "title": "Finanzas e instrumentos", "orientative_duration": "2 a 4 meses", "main_product": "Comprensión comparativa de activos y valuación", "sort_order": 3 },
+  { "code": "ET4", "title": "Primera misión aplicada: opciones argentinas", "orientative_duration": "por dominio", "main_product": "Simulación, planilla, protocolos y casos", "sort_order": 4 },
+  { "code": "ET5", "title": "Asignación de capital y gestión de cartera", "orientative_duration": "por proyecto", "main_product": "Política personal de asignación de capital", "sort_order": 5 },
+  { "code": "ET6", "title": "Geopolítica, tecnología y tendencias", "orientative_duration": "transversal", "main_product": "Dossiers y escenarios", "sort_order": 6 },
+  { "code": "ET7", "title": "Finanzas corporativas y dirección empresarial", "orientative_duration": "largo plazo", "main_product": "Política financiera empresarial", "sort_order": 7 }
+]
