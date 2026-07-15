@@ -269,6 +269,36 @@ export interface ContinuityPointRow {
   created_at: string;
 }
 
+export interface ObsidianNoteRow {
+  id: string;
+  vault_relative_path: string;
+  title: string | null;
+  frontmatter_json: string | null;
+  indexed_at: string;
+  checksum: string | null;
+  sodiac_id: string | null;
+  note_type: string | null;
+  status: string | null;
+  mastery_level: number | null;
+  last_review_at: string | null;
+  next_review_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NoteLinkRow {
+  id: string;
+  source_note_id: string;
+  target_note_path: string;
+  link_type: "wikilink" | "embed";
+  created_at: string;
+}
+
+export type ObsidianPermissionMode =
+  | "solo_lectura"
+  | "lectura_creacion"
+  | "lectura_creacion_actualizacion_metadatos";
+
 export interface UserSettingRow {
   id: string;
   key: string;

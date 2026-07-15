@@ -16,6 +16,7 @@ import type {
 } from "@/database/types";
 import { generateChatGptPrompt, startSession, type StartSessionInput } from "@/services/sessions";
 import { createTask } from "@/services/tasks";
+import { getVaultPath, openVaultInObsidian } from "@/services/obsidian";
 
 const SESSION_TYPES: { value: SessionType; label: string }[] = [
   { value: "explicacion", label: "Explicación" },
@@ -53,6 +54,7 @@ export function StartSessionPage() {
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
+  const [vaultConfigured, setVaultConfigured] = useState(false);
 
   useEffect(() => {
     void Promise.all([
@@ -60,11 +62,13 @@ export function StartSessionPage() {
       competenciesRepo.list({ where: "archived_at IS NULL", orderBy: "code" }),
       subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
       topicsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
-    ]).then(([q, c, s, t]) => {
+      getVaultPath(),
+    ]).then(([q, c, s, t, vault]) => {
       setQuestions(q);
       setCompetencies(c);
       setSubjects(s);
       setTopics(t);
+      setVaultConfigured(vault !== null);
     });
   }, []);
 
@@ -284,11 +288,12 @@ export function StartSessionPage() {
           </button>
           <button
             type="button"
-            disabled
-            title="Disponible en Fase 6 (integración con Obsidian)"
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted opacity-50"
+            disabled={!vaultConfigured}
+            title={vaultConfigured ? undefined : "Configurá el vault en Obsidian primero"}
+            onClick={() => openVaultInObsidian()}
+            className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:text-text-muted disabled:opacity-50"
           >
-            Abrir nota en Obsidian
+            Abrir vault en Obsidian
           </button>
           <button
             type="button"

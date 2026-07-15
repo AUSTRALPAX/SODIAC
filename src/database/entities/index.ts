@@ -12,6 +12,8 @@ import type {
   LearningEvidenceRow,
   LearningStageRow,
   MasteryAssessmentRow,
+  NoteLinkRow,
+  ObsidianNoteRow,
   PomodoroCycleRow,
   ProjectMilestoneRow,
   ProjectRow,
@@ -50,3 +52,5 @@ export const pomodoroCyclesRepo = createRepository<PomodoroCycleRow>("pomodoro_c
 export const learningEvidenceRepo = createRepository<LearningEvidenceRow>("learning_evidence");
 export const masteryAssessmentsRepo = createRepository<MasteryAssessmentRow>("mastery_assessment");
 export const reviewsRepo = createRepository<ReviewRow>("review");
+export const obsidianNotesRepo = createRepository<ObsidianNoteRow>("obsidian_note");
+export const noteLinksRepo = createRepository<NoteLinkRow>("note_link");

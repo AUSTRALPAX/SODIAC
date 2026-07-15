@@ -10,6 +10,7 @@ import {
 } from "@/database/entities";
 import type { CompetencyRow, StudyBlockRow, StudySessionRow, TopicRow } from "@/database/types";
 import { cancelSession, finalizeSession, recordComprobacion } from "@/services/sessions";
+import { getVaultPath, openVaultInObsidian } from "@/services/obsidian";
 import {
   usePomodoro,
   DEFAULT_POMODORO_SETTINGS,
@@ -81,20 +82,23 @@ export function ActiveSessionPage() {
   const [reviewDueAt, setReviewDueAt] = useState("");
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const [vaultConfigured, setVaultConfigured] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
     const row = await studySessionsRepo.getById(id);
     setSession(row);
     if (row) {
-      const [c, t, b] = await Promise.all([
+      const [c, t, b, vault] = await Promise.all([
         row.competency_id ? competenciesRepo.getById(row.competency_id) : Promise.resolve(null),
         row.topic_id ? topicsRepo.getById(row.topic_id) : Promise.resolve(null),
         studyBlocksRepo.list({ where: "study_session_id = ?", params: [row.id], orderBy: "created_at DESC" }),
+        getVaultPath(),
       ]);
       setCompetency(c);
       setTopic(t);
       setBlocks(b);
+      setVaultConfigured(vault !== null);
     }
     setLoading(false);
   }, [id]);
@@ -292,7 +296,12 @@ export function ActiveSessionPage() {
         <button onClick={() => openUrl("https://chat.openai.com")} className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent">
           Abrir ChatGPT
         </button>
-        <button disabled title="Fase 6" className="rounded border border-border px-4 py-2 text-sm text-text-muted opacity-50">
+        <button
+          disabled={!vaultConfigured}
+          title={vaultConfigured ? undefined : "Configurá el vault en Obsidian primero"}
+          onClick={() => openVaultInObsidian()}
+          className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:text-text-muted disabled:opacity-50"
+        >
           Abrir Obsidian
         </button>
         <button onClick={() => setShowComprobar(true)} className="rounded border border-accent px-4 py-2 text-sm uppercase tracking-wide text-accent">
