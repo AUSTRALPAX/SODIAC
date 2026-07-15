@@ -17,3 +17,34 @@ html, body, #root {
 body {
   font-family: "Inter", sans-serif;
 }
+
+/* FullCalendar — tema oscuro de SODIAC (docs/DESIGN_SYSTEM.md) */
+.sodiac-calendar .fc {
+  --fc-border-color: var(--border-subtle);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--surface-hover);
+  --fc-list-event-hover-bg-color: var(--surface-hover);
+  --fc-today-bg-color: rgba(0, 214, 197, 0.08);
+  --fc-event-border-color: transparent;
+  --fc-button-bg-color: var(--surface-elevated);
+  --fc-button-border-color: var(--border);
+  --fc-button-hover-bg-color: var(--surface-hover);
+  --fc-button-hover-border-color: var(--accent);
+  --fc-button-active-bg-color: var(--surface-hover);
+  color: var(--text-primary);
+}
+.sodiac-calendar .fc-daygrid-day-number,
+.sodiac-calendar .fc-col-header-cell-cushion,
+.sodiac-calendar .fc-toolbar-title {
+  color: var(--text-primary);
+}
+.sodiac-calendar .fc-button {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.sodiac-calendar .fc-event {
+  border-radius: 4px;
+  padding: 1px 4px;
+  cursor: pointer;
+}

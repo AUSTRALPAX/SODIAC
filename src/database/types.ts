@@ -94,6 +94,63 @@ export interface DocumentVersionRow {
   updated_at: string;
 }
 
+export interface TaskRow extends BaseRow {
+  title: string;
+  description: string | null;
+  due_at: string | null;
+  priority: "baja" | "media" | "alta" | "critica";
+  task_type: "estudio" | "administrativo" | "proyecto" | "otro";
+  project_id: string | null;
+  study_session_id: string | null;
+  completed_at: string | null;
+}
+
+export interface TaskHistoryRow {
+  id: string;
+  task_id: string;
+  changed_field: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_at: string;
+  reason: string | null;
+}
+
+export interface DailyPlanRow {
+  id: string;
+  plan_date: string;
+  energy_declared: number | null;
+  available_minutes: number | null;
+  focus_subject_id: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeeklyPlanRow {
+  id: string;
+  week_start_date: string;
+  review_type: "cada_5_sesiones" | "etapa" | "trimestral" | "extraordinaria" | null;
+  accelerated_json: string | null;
+  postponed_json: string | null;
+  removed_json: string | null;
+  added_json: string | null;
+  rationale: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContinuityPointRow {
+  id: string;
+  study_session_id: string | null;
+  topic_id: string | null;
+  project_id: string | null;
+  description: string;
+  created_at: string;
+}
+
 export interface UserSettingRow {
   id: string;
   key: string;

@@ -1,5 +1,196 @@
-import { PagePlaceholder } from "@/components/layout/PagePlaceholder";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import esLocale from "@fullcalendar/core/locales/es";
+import type { EventClickArg, EventDropArg } from "@fullcalendar/core";
+import {
+  completeTask,
+  createTask,
+  listAllTasks,
+  reopenTask,
+  rescheduleTask,
+} from "@/services/tasks";
+import type { TaskRow } from "@/database/types";
+import { localDateInputToIso } from "@/utils/date";
+
+const PRIORITIES: TaskRow["priority"][] = ["baja", "media", "alta", "critica"];
+const PRIORITY_LABEL: Record<TaskRow["priority"], string> = {
+  critica: "Crítica",
+  alta: "Alta",
+  media: "Media",
+  baja: "Baja",
+};
+const PRIORITY_COLOR: Record<TaskRow["priority"], string> = {
+  critica: "#FF6B72",
+  alta: "#E6B85C",
+  media: "#00D6C5",
+  baja: "#6F7980",
+};
 
 export function PlanningPage() {
-  return <PagePlaceholder title="Planificación" phase="Fase 3 — Dashboard y planificación" />;
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState<TaskRow["priority"]>("media");
+  const [creating, setCreating] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setTasks(await listAllTasks());
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function handleCreate(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    setCreating(true);
+    try {
+      await createTask({
+        title: trimmed,
+        due_at: dueDate ? localDateInputToIso(dueDate) : null,
+        priority,
+      });
+      setTitle("");
+      setDueDate("");
+      setPriority("media");
+      await refresh();
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleToggle(task: TaskRow) {
+    if (task.status === "completada") {
+      await reopenTask(task.id);
+    } else {
+      await completeTask(task.id);
+    }
+    await refresh();
+  }
+
+  async function handleEventDrop(info: EventDropArg) {
+    const newDate = info.event.start;
+    if (!newDate) return;
+    await rescheduleTask(info.event.id, newDate.toISOString(), "Reprogramada arrastrando en el calendario.");
+    await refresh();
+  }
+
+  function handleEventClick(info: EventClickArg) {
+    info.jsEvent.preventDefault();
+    const task = tasks.find((t) => t.id === info.event.id);
+    if (task) void handleToggle(task);
+  }
+
+  const events = tasks
+    .filter((t) => t.due_at)
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      start: t.due_at!,
+      allDay: true,
+      color: PRIORITY_COLOR[t.priority],
+      classNames: t.status === "completada" ? ["opacity-40", "line-through"] : [],
+    }));
+
+  return (
+    <div className="grid h-full grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-[360px_1fr]">
+      <div className="space-y-6">
+        <h1 className="font-display text-2xl">Planificación</h1>
+
+        <form onSubmit={handleCreate} className="space-y-2 rounded border border-border-subtle bg-surface p-4">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Título de la tarea"
+            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
+          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="flex-1 rounded border border-border bg-background px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+            />
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as TaskRow["priority"])}
+              className="rounded border border-border bg-background px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+            >
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {PRIORITY_LABEL[p]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={creating || !title.trim()}
+            className="w-full rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent disabled:opacity-40"
+          >
+            {creating ? "Creando…" : "Crear tarea"}
+          </button>
+        </form>
+
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            Todas las tareas
+          </h2>
+          {loading ? (
+            <p className="mt-2 text-sm text-text-muted">Cargando…</p>
+          ) : tasks.length === 0 ? (
+            <p className="mt-2 text-sm text-text-muted">Todavía no hay tareas.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-border-subtle rounded border border-border-subtle bg-surface">
+              {tasks.map((task) => (
+                <li key={task.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                  <div className={task.status === "completada" ? "text-text-muted line-through" : "text-text-primary"}>
+                    {task.title}
+                    <div className="text-xs text-text-muted">
+                      {task.due_at ? new Date(task.due_at).toLocaleDateString("es-AR") : "sin fecha"} ·{" "}
+                      {PRIORITY_LABEL[task.priority]}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleToggle(task)}
+                    className="shrink-0 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent"
+                  >
+                    {task.status === "completada" ? "Reabrir" : "Completar"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="sodiac-calendar rounded border border-border-subtle bg-surface p-4">
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          headerToolbar={{
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,timeGridWeek",
+          }}
+          locale={esLocale}
+          firstDay={1}
+          editable
+          eventStartEditable
+          events={events}
+          eventDrop={handleEventDrop}
+          eventClick={handleEventClick}
+          height="auto"
+        />
+      </div>
+    </div>
+  );
 }
