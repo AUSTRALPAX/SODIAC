@@ -2,6 +2,7 @@ import { createRepository } from "../repository";
 import type {
   ActivityLogRow,
   BackupRecordRow,
+  BibliographicSourceRow,
   CompetencyRow,
   ContinuityPointRow,
   CurriculumDependencyRow,
@@ -17,6 +18,7 @@ import type {
   PomodoroCycleRow,
   ProjectMilestoneRow,
   ProjectRow,
+  ResourceRow,
   ReviewRow,
   StudyBlockRow,
   StudySessionRow,
@@ -54,3 +56,5 @@ export const masteryAssessmentsRepo = createRepository<MasteryAssessmentRow>("ma
 export const reviewsRepo = createRepository<ReviewRow>("review");
 export const obsidianNotesRepo = createRepository<ObsidianNoteRow>("obsidian_note");
 export const noteLinksRepo = createRepository<NoteLinkRow>("note_link");
+export const resourcesRepo = createRepository<ResourceRow>("resource");
+export const bibliographicSourcesRepo = createRepository<BibliographicSourceRow>("bibliographic_source");

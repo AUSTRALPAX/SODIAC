@@ -269,6 +269,46 @@ export interface ContinuityPointRow {
   created_at: string;
 }
 
+export interface ResourceRow extends BaseRow {
+  title: string;
+  resource_type:
+    | "libro"
+    | "articulo"
+    | "informe"
+    | "video"
+    | "curso"
+    | "sitio"
+    | "dataset"
+    | "documento_interno"
+    | "archivo_local";
+  author: string | null;
+  function_note: "estructural" | "didactica" | "tecnica" | "caso" | "critica" | "referencia" | null;
+  reading_state:
+    | "pendiente"
+    | "consultando"
+    | "activo"
+    | "finalizado"
+    | "referencia"
+    | "descartado"
+    | "reemplazado";
+  priority: string | null;
+  file_path: string | null;
+  url: string | null;
+}
+
+export interface BibliographicSourceRow {
+  id: string;
+  resource_id: string;
+  fundamental_question_id: string | null;
+  competency_id: string | null;
+  subject_id: string | null;
+  topic_id: string | null;
+  project_id: string | null;
+  study_session_id: string | null;
+  obsidian_note_id: string | null;
+  created_at: string;
+}
+
 export interface ObsidianNoteRow {
   id: string;
   vault_relative_path: string;
