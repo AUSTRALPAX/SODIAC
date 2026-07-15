@@ -7,8 +7,8 @@ export function AppShell() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-text-primary">
       <aside className="flex w-56 shrink-0 flex-col border-r border-border-subtle bg-background-deep">
-        <div className="px-5 py-5 text-text-primary">
-          <SodiacLogo variant="horizontal" size={22} />
+        <div className="px-5 py-6 text-text-primary">
+          <SodiacLogo variant="horizontal" size={32} />
         </div>
         <nav className="flex-1 space-y-0.5 px-2">
           {NAV_ITEMS.map((item) => (
