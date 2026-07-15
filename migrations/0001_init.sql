@@ -22,7 +22,7 @@ CREATE TABLE fundamental_question (
 
 CREATE TABLE competency (
   id TEXT PRIMARY KEY,
-  fundamental_question_id TEXT NOT NULL REFERENCES fundamental_question(id),
+  fundamental_question_id TEXT REFERENCES fundamental_question(id),
   code TEXT UNIQUE NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
