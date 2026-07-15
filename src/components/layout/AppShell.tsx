@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Mark } from "@/components/brand/Mark";
+import { SodiacLogo } from "@/components/brand/SodiacLogo";
 import { NAV_ITEMS } from "./navigation";
 import { CommandPalette } from "./CommandPalette";
 
@@ -7,11 +7,8 @@ export function AppShell() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-text-primary">
       <aside className="flex w-56 shrink-0 flex-col border-r border-border-subtle bg-background-deep">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <Mark size={22} />
-          <span className="font-display text-sm font-semibold tracking-[0.2em]">
-            SODIAC
-          </span>
+        <div className="px-5 py-5 text-text-primary">
+          <SodiacLogo variant="horizontal" size={22} />
         </div>
         <nav className="flex-1 space-y-0.5 px-2">
           {NAV_ITEMS.map((item) => (

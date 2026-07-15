@@ -48,10 +48,17 @@ Mapeados 1:1 a tokens de Tailwind (`tailwind.config.ts` → `theme.extend.colors
 
 ## 4. Marca
 
-- Wordmark "SODIAC" en mayúsculas, tracking amplio.
-- Símbolo geométrico original (sugiere nodos/órbita/sistema), separado del wordmark, ubicado en
-  `src/components/brand/Mark.tsx` como SVG editable — reemplazable sin tocar el resto de la UI.
-- Explícitamente distinto del logotipo de Muso.AI.
+- Símbolo oficial aprobado: una "S" estilizada atravesada por una aguja/brújula de cuatro
+  puntas y dos destellos, vectorizado a mano a partir de la referencia visual del Instituto.
+  Geometría fuente en `src/assets/brand/` (variantes símbolo, lockup horizontal, lockup
+  apilado, ícono de app) y componente reutilizable `src/components/brand/SodiacLogo.tsx`
+  (`variant="symbol" | "horizontal" | "stacked"`, usa `currentColor`).
+- Wordmark "SODIAC" en mayúsculas, Space Grotesk SemiBold, tracking amplio, siempre separado
+  del símbolo (el símbolo debe seguir funcionando solo).
+- No se recomienda el símbolo por debajo de 24px (la "S" pierde legibilidad); no existe aún
+  una variante óptica simplificada para tamaños menores — se agregará solo si un uso concreto
+  lo requiere.
+- No modificar la geometría del símbolo sin autorización explícita.
 
 ## 5. Cabecera del dashboard "Hoy"
 

@@ -1,0 +1,120 @@
+/**
+ * Logotipo oficial de SODIAC. Geometría fuente: src/assets/brand/*.svg
+ * (vectorizado a partir de la referencia visual aprobada). No alterar la
+ * geometría del símbolo sin autorización explícita — ver docs/DESIGN_SYSTEM.md §4.
+ *
+ * Usa currentColor: el color se controla desde el CSS del elemento padre
+ * (por defecto blanco vía text-text-primary / text-white en los usos actuales).
+ */
+
+const SYMBOL_PATHS = [
+  "M 110.00 154.97 L 109.00 154.67 L 108.54 153.00 L 104.00 126.15 L 103.16 123.00 L 92.00 118.86 L 91.00 119.39 L 89.00 121.54 L 86.00 121.48 L 85.42 121.00 L 85.21 120.00 L 84.62 100.00 L 85.00 98.69 L 86.00 98.30 L 88.00 98.54 L 89.00 99.12 L 92.98 108.00 L 96.00 112.27 L 100.00 115.74 L 101.00 116.26 L 102.02 116.00 L 99.03 98.00 L 98.33 97.00 L 94.00 95.98 L 44.00 88.37 L 42.44 88.00 L 41.89 87.00 L 48.00 85.61 L 83.00 79.54 L 84.05 80.00 L 86.00 83.15 L 89.00 86.78 L 92.00 89.19 L 97.00 92.03 L 111.00 97.57 L 115.00 100.25 L 116.48 102.00 L 117.68 105.00 L 117.74 107.00 L 116.59 115.00 L 116.87 116.00 L 118.00 115.66 L 119.00 114.76 L 120.72 112.00 L 121.59 107.00 L 121.07 103.00 L 119.15 99.00 L 116.00 96.03 L 114.00 94.81 L 98.00 88.20 L 92.00 84.31 L 88.61 80.00 L 87.10 76.00 L 86.61 73.00 L 86.89 67.00 L 87.86 64.00 L 89.50 61.00 L 91.04 59.00 L 94.40 56.00 L 97.00 54.43 L 99.00 54.07 L 99.62 55.00 L 99.27 58.00 L 98.60 60.00 L 96.40 64.00 L 96.03 68.00 L 96.79 71.00 L 98.00 73.32 L 99.00 74.49 L 100.00 74.82 L 100.40 74.00 L 108.56 22.00 L 109.00 20.19 L 110.00 19.74 L 111.46 26.00 L 116.26 53.00 L 117.01 54.00 L 121.00 56.04 L 122.35 56.00 L 124.00 54.14 L 125.00 53.63 L 127.00 53.61 L 128.00 54.23 L 128.41 55.00 L 128.74 74.00 L 128.69 75.00 L 128.10 76.00 L 126.00 76.26 L 125.00 75.94 L 124.00 75.00 L 122.00 69.28 L 120.00 65.02 L 119.00 63.60 L 118.06 64.00 L 120.00 75.41 L 121.00 77.67 L 127.45 79.00 L 171.00 85.71 L 177.30 87.00 L 177.02 88.00 L 176.00 88.28 L 131.73 96.00 L 131.13 97.00 L 131.71 102.00 L 131.40 106.00 L 130.12 110.00 L 128.48 113.00 L 126.03 116.00 L 123.83 118.00 L 120.00 120.45 L 116.15 122.00 L 115.32 123.00 L 111.41 148.00 L 110.00 154.97 Z",
+  "M 70.00 62.93 L 69.00 62.55 L 67.19 59.00 L 64.50 56.00 L 63.00 54.88 L 59.04 53.00 L 59.55 52.00 L 63.00 50.24 L 65.00 48.70 L 67.23 46.00 L 69.00 42.62 L 70.00 42.23 L 71.94 46.00 L 73.52 48.00 L 76.00 50.14 L 79.62 52.00 L 80.23 53.00 L 76.00 54.96 L 73.58 57.00 L 72.00 59.07 L 70.00 62.93 Z",
+  "M 150.00 132.38 L 149.00 132.34 L 147.42 129.00 L 145.16 126.00 L 138.69 122.00 L 142.89 120.00 L 145.00 118.39 L 147.04 116.00 L 149.00 112.04 L 150.00 111.95 L 152.96 117.00 L 153.93 118.00 L 156.50 120.00 L 160.63 122.00 L 159.33 123.00 L 156.96 124.00 L 154.00 126.24 L 152.00 128.78 L 150.00 132.38 Z",
+];
+
+const SYMBOL_VIEWBOX = "33.89 11.74 151.40 151.23";
+
+function SymbolPaths() {
+  return (
+    <g fill="currentColor">
+      {SYMBOL_PATHS.map((d) => (
+        <path key={d.slice(0, 12)} d={d} />
+      ))}
+    </g>
+  );
+}
+
+interface SodiacLogoProps {
+  variant?: "symbol" | "horizontal" | "stacked";
+  size?: number;
+  className?: string;
+  ariaLabel?: string;
+  decorative?: boolean;
+}
+
+/**
+ * variant="symbol": solo el símbolo, cuadrado, `size` define alto y ancho.
+ * variant="horizontal": símbolo a la izquierda + wordmark a la derecha, `size` define el alto.
+ * variant="stacked": símbolo arriba + wordmark abajo, `size` define el alto.
+ */
+export function SodiacLogo({
+  variant = "symbol",
+  size = 24,
+  className,
+  ariaLabel = "SODIAC",
+  decorative = false,
+}: SodiacLogoProps) {
+  const a11yProps = decorative
+    ? { "aria-hidden": true }
+    : { role: "img", "aria-label": ariaLabel };
+
+  if (variant === "symbol") {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox={SYMBOL_VIEWBOX}
+        className={className}
+        {...a11yProps}
+      >
+        <SymbolPaths />
+      </svg>
+    );
+  }
+
+  if (variant === "horizontal") {
+    const width = size * (470 / 160);
+    return (
+      <svg
+        width={width}
+        height={size}
+        viewBox="0 0 470 160"
+        className={className}
+        {...a11yProps}
+      >
+        <g transform="translate(10,10) scale(0.9257) translate(-33.89,-11.74)">
+          <SymbolPaths />
+        </g>
+        <text
+          x={174}
+          y={102}
+          fontFamily="'Space Grotesk', sans-serif"
+          fontWeight={600}
+          fontSize={64}
+          letterSpacing={10}
+          fill="currentColor"
+        >
+          SODIAC
+        </text>
+      </svg>
+    );
+  }
+
+  const width = size * (200 / 220);
+  return (
+    <svg
+      width={width}
+      height={size}
+      viewBox="0 0 200 220"
+      className={className}
+      {...a11yProps}
+    >
+      <g transform="translate(25,10) scale(0.9908) translate(-33.89,-11.74)">
+        <SymbolPaths />
+      </g>
+      <text
+        x={100}
+        y={200}
+        textAnchor="middle"
+        fontFamily="'Space Grotesk', sans-serif"
+        fontWeight={600}
+        fontSize={34}
+        letterSpacing={6}
+        fill="currentColor"
+      >
+        SODIAC
+      </text>
+    </svg>
+  );
+}

@@ -1,3 +1,5 @@
+import { SodiacLogo } from "@/components/brand/SodiacLogo";
+
 /**
  * Dashboard "Hoy" — pantalla inicial. Responde primero: "¿qué conviene estudiar
  * ahora y por qué?" (docs/PRODUCT_SPEC.md §6). Construcción completa en Fase 3;
@@ -14,6 +16,12 @@ export function TodayPage() {
             "radial-gradient(1200px 400px at 20% -20%, var(--atmosphere-blue), transparent), radial-gradient(900px 400px at 90% 10%, var(--atmosphere-purple), transparent), var(--background-deep)",
         }}
       >
+        <SodiacLogo
+          variant="symbol"
+          size={72}
+          decorative
+          className="pointer-events-none absolute right-10 top-10 text-text-primary opacity-[0.08]"
+        />
         <p className="text-sm text-text-secondary">
           {new Date().toLocaleDateString("es-AR", {
             weekday: "long",
