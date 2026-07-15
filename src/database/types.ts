@@ -47,6 +47,17 @@ export interface TopicRow extends BaseRow {
   description: string | null;
 }
 
+export interface CurriculumDependencyRow {
+  id: string;
+  from_topic_id: string;
+  to_topic_id: string;
+  dependency_type: "requires" | "suggests";
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProjectRow extends BaseRow {
   fundamental_question_id: string | null;
   competency_id: string | null;
@@ -92,6 +103,113 @@ export interface DocumentVersionRow {
   status: string;
   created_at: string;
   updated_at: string;
+}
+
+export type SessionType =
+  | "explicacion"
+  | "debate"
+  | "lectura"
+  | "ejercicio"
+  | "laboratorio"
+  | "revision"
+  | "aplicacion"
+  | "produccion_escrita"
+  | "diagnostico";
+
+export interface StudySessionRow extends BaseRow {
+  fundamental_question_id: string | null;
+  competency_id: string | null;
+  subject_id: string | null;
+  topic_id: string | null;
+  session_type: SessionType;
+  planned_duration_min: number | null;
+  actual_duration_min: number | null;
+  prior_knowledge: string | null;
+  observable_objective: string | null;
+  resources: string | null;
+  expected_product: string | null;
+  continuity_point_prev_id: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  closure_status: "en_curso" | "formal" | "cancelada" | "incompleta";
+  conclusion: string | null;
+  evidence_summary: string | null;
+  next_action: string | null;
+  continuity_point: string | null;
+}
+
+export interface StudyBlockRow {
+  id: string;
+  study_session_id: string;
+  block_type: "comprension" | "aplicacion" | "consolidacion";
+  started_at: string | null;
+  ended_at: string | null;
+  quick_notes: string | null;
+  status: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PomodoroCycleRow {
+  id: string;
+  study_session_id: string;
+  cycle_index: number;
+  phase: "foco" | "pausa_corta" | "pausa_larga";
+  planned_minutes: number;
+  actual_minutes: number | null;
+  interrupted: number;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LearningEvidenceRow extends BaseRow {
+  study_session_id: string | null;
+  project_id: string | null;
+  evidence_type: string;
+  title: string;
+  description: string | null;
+  file_path: string | null;
+  obsidian_note_id: string | null;
+}
+
+export interface MasteryAssessmentRow {
+  id: string;
+  competency_id: string;
+  topic_id: string | null;
+  level: number;
+  assessed_at: string;
+  declared_confidence: number | null;
+  perceived_difficulty: number | null;
+  result_explanation: string | null;
+  evidence_id: string | null;
+  evaluator: "fundador" | "chatgpt" | "sodiac_heuristica";
+  is_provisional: number;
+  next_advance_criterion: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReviewRow extends BaseRow {
+  competency_id: string | null;
+  topic_id: string | null;
+  evidence_id: string | null;
+  due_at: string | null;
+  state:
+    | "no_programado"
+    | "proximo"
+    | "pendiente"
+    | "vencido"
+    | "completado"
+    | "pospuesto"
+    | "innecesario"
+    | "enfriado";
+  reason_factors: string | null;
+  completed_at: string | null;
 }
 
 export interface TaskRow extends BaseRow {

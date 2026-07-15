@@ -17,6 +17,7 @@ export interface NewTaskInput {
   priority?: TaskRow["priority"];
   task_type?: TaskRow["task_type"];
   project_id?: string | null;
+  study_session_id?: string | null;
 }
 
 export async function createTask(input: NewTaskInput): Promise<TaskRow> {
@@ -28,7 +29,7 @@ export async function createTask(input: NewTaskInput): Promise<TaskRow> {
     priority: input.priority ?? "media",
     task_type: input.task_type ?? "estudio",
     project_id: input.project_id ?? null,
-    study_session_id: null,
+    study_session_id: input.study_session_id ?? null,
     completed_at: null,
     status: "pendiente",
     sort_order: 0,

@@ -13,6 +13,8 @@
     "sql:allow-select",
     "dialog:default",
     "dialog:allow-save",
+    "opener:default",
+    "opener:allow-open-url",
     "fs:default",
     "fs:allow-mkdir",
     "fs:allow-copy-file",

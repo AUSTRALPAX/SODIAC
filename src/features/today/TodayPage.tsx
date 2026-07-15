@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { SodiacLogo } from "@/components/brand/SodiacLogo";
 import { recommendNextAction, type Recommendation } from "@/services/recommendation";
 import { completeTask, createTask, listActiveTasks } from "@/services/tasks";
-import type { TaskRow } from "@/database/types";
+import { getInProgressSession } from "@/services/sessions";
+import type { StudySessionRow, TaskRow } from "@/database/types";
 
 function formatDue(iso: string | null): string {
   if (!iso) return "sin fecha";
@@ -28,14 +29,20 @@ const PRIORITY_LABEL: Record<TaskRow["priority"], string> = {
 export function TodayPage() {
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [inProgressSession, setInProgressSession] = useState<StudySessionRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [quickTitle, setQuickTitle] = useState("");
   const [creating, setCreating] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [rec, activeTasks] = await Promise.all([recommendNextAction(), listActiveTasks()]);
+    const [rec, activeTasks, active] = await Promise.all([
+      recommendNextAction(),
+      listActiveTasks(),
+      getInProgressSession(),
+    ]);
     setRecommendation(rec);
     setTasks(activeTasks);
+    setInProgressSession(active);
     setLoading(false);
   }, []);
 
@@ -101,13 +108,21 @@ export function TodayPage() {
             ))}
           </ul>
         )}
-        <button
-          disabled
-          title="Disponible al completar la Fase 4 (protocolo INICIAR ESTUDIO)"
-          className="mt-6 rounded border border-accent px-5 py-2.5 text-sm font-medium uppercase tracking-wide text-accent opacity-50"
-        >
-          Iniciar estudio
-        </button>
+        {inProgressSession ? (
+          <Link
+            to={`/sesiones/${inProgressSession.id}`}
+            className="mt-6 inline-block rounded border border-accent bg-accent/10 px-5 py-2.5 text-sm font-medium uppercase tracking-wide text-accent"
+          >
+            Continuar sesión interrumpida
+          </Link>
+        ) : (
+          <Link
+            to="/sesiones/nueva"
+            className="mt-6 inline-block rounded border border-accent px-5 py-2.5 text-sm font-medium uppercase tracking-wide text-accent"
+          >
+            Iniciar estudio
+          </Link>
+        )}
       </header>
 
       <div className="grid gap-8 p-10 md:grid-cols-[1fr_320px]">

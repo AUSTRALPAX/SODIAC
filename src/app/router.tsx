@@ -3,6 +3,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { TodayPage } from "@/features/today/TodayPage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";
 import { SessionsPage } from "@/features/sessions/SessionsPage";
+import { StartSessionPage } from "@/features/sessions/StartSessionPage";
+import { ActiveSessionPage } from "@/features/sessions/ActiveSessionPage";
 import { PlanningPage } from "@/features/planning/PlanningPage";
 import { ReviewsPage } from "@/features/reviews/ReviewsPage";
 import { ProjectsPage } from "@/features/projects/ProjectsPage";
@@ -20,6 +22,8 @@ export const router = createBrowserRouter([
       { index: true, element: <TodayPage /> },
       { path: "mapa", element: <CurriculumPage /> },
       { path: "sesiones", element: <SessionsPage /> },
+      { path: "sesiones/nueva", element: <StartSessionPage /> },
+      { path: "sesiones/:id", element: <ActiveSessionPage /> },
       { path: "planificacion", element: <PlanningPage /> },
       { path: "repasos", element: <ReviewsPage /> },
       { path: "proyectos", element: <ProjectsPage /> },
