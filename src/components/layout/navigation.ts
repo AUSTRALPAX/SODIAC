@@ -12,6 +12,7 @@ import {
   Settings,
   Home,
   Trophy,
+  GraduationCap,
 } from "lucide-react";
 
 export interface NavItem {
@@ -23,6 +24,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: Home },
   { label: "Trayectoria", path: "/trajectory", icon: Trophy },
+  { label: "Carrera", path: "/carrera", icon: GraduationCap },
   { label: "Mapa", path: "/mapa", icon: Network },
   { label: "Sesiones", path: "/sesiones", icon: BookOpen },
   { label: "Planificación", path: "/planificacion", icon: Calendar },

@@ -353,6 +353,18 @@ export interface BibliographicSourceRow {
   created_at: string;
 }
 
+export interface ResourceUsageEventRow {
+  id: string;
+  resource_id: string;
+  session_id: string | null;
+  subject_id: string | null;
+  topic_id: string | null;
+  project_id: string | null;
+  note_id: string | null;
+  action: "abierto" | "consultado" | "vinculado" | "citado" | "utilizado_en_sesion" | "utilizado_en_proyecto";
+  occurred_at: string;
+}
+
 export interface ObsidianNoteRow {
   id: string;
   vault_relative_path: string;

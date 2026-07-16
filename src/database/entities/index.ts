@@ -35,6 +35,7 @@ import type {
   ProjectMilestoneRow,
   ProjectRow,
   ResourceRow,
+  ResourceUsageEventRow,
   ReviewRow,
   RubricCriterionRow,
   StudyBlockRow,
@@ -80,6 +81,7 @@ export const reviewsRepo = createRepository<ReviewRow>("review");
 export const obsidianNotesRepo = createRepository<ObsidianNoteRow>("obsidian_note");
 export const noteLinksRepo = createRepository<NoteLinkRow>("note_link");
 export const resourcesRepo = createRepository<ResourceRow>("resource");
+export const resourceUsageEventsRepo = createRepository<ResourceUsageEventRow>("resource_usage_event");
 export const bibliographicSourcesRepo = createRepository<BibliographicSourceRow>("bibliographic_source");
 
 // --- Sistema académico de calificaciones, XP, niveles y rangos --------------------------

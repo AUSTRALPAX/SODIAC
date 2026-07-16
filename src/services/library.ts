@@ -1,4 +1,6 @@
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { bibliographicSourcesRepo, resourcesRepo } from "@/database/entities";
+import { recordResourceUsage } from "@/services/resourceUsage";
 import type { ResourceRow } from "@/database/types";
 
 const now = () => new Date().toISOString();
@@ -59,6 +61,22 @@ export async function linkResourceToProject(resourceId: string, projectId: strin
     obsidian_note_id: null,
     created_at: now(),
   });
+}
+
+/**
+ * Abre el archivo local o el enlace de un recurso y registra el evento de
+ * uso — el contador de "consultas" solo crece por una apertura explícita
+ * como esta, nunca por rerenderizar la pantalla de Biblioteca.
+ */
+export async function openResource(resource: ResourceRow): Promise<void> {
+  if (resource.file_path) {
+    await openPath(resource.file_path);
+  } else if (resource.url) {
+    await openUrl(resource.url);
+  } else {
+    throw new Error("Este recurso no tiene archivo local ni enlace configurado.");
+  }
+  await recordResourceUsage({ resourceId: resource.id, action: "abierto" });
 }
 
 export async function getProjectIdsForResource(resourceId: string): Promise<string[]> {

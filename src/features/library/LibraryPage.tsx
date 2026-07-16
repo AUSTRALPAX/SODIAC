@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ProjectRow, ResourceRow } from "@/database/types";
-import { createResource, getProjectIdsForResource, linkResourceToProject, listResources, setReadingState } from "@/services/library";
+import { createResource, getProjectIdsForResource, linkResourceToProject, listResources, openResource, setReadingState } from "@/services/library";
 import { importLibraryInstitutionalBase, type LibraryImportSummary } from "@/services/libraryImport";
 import { listProjects } from "@/services/projects";
+import { getUsageCountForResource } from "@/services/resourceUsage";
 
 const RESOURCE_TYPES: ResourceRow["resource_type"][] = [
   "libro",
@@ -71,18 +72,23 @@ export function LibraryPage() {
 
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState<LibraryImportSummary | null>(null);
+  const [usageByResource, setUsageByResource] = useState<Map<string, number>>(new Map());
+  const [openError, setOpenError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const [res, projs] = await Promise.all([listResources(), listProjects()]);
     setResources(res);
     setProjects(projs);
     const links = new Map<string, string[]>();
+    const usage = new Map<string, number>();
     await Promise.all(
       res.map(async (r) => {
         links.set(r.id, await getProjectIdsForResource(r.id));
+        usage.set(r.id, await getUsageCountForResource(r.id));
       }),
     );
     setLinkedByResource(links);
+    setUsageByResource(usage);
     setLoading(false);
   }, []);
 
@@ -115,6 +121,16 @@ export function LibraryPage() {
     if (!projectId) return;
     await linkResourceToProject(resourceId, projectId);
     await refresh();
+  }
+
+  async function handleOpen(r: ResourceRow) {
+    setOpenError(null);
+    try {
+      await openResource(r);
+      await refresh();
+    } catch (error) {
+      setOpenError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   async function handleImport() {
@@ -181,6 +197,8 @@ export function LibraryPage() {
           </button>
         </div>
       </div>
+
+      {openError && <p className="mt-3 text-xs text-danger">No se pudo abrir el recurso: {openError}</p>}
 
       {importSummary && (
         <p className="mt-3 rounded border border-border-subtle bg-surface p-3 text-xs text-text-secondary">
@@ -352,7 +370,21 @@ export function LibraryPage() {
                 <div className="mt-2 space-y-1 rounded border border-border-subtle bg-background p-3 text-xs text-text-secondary">
                   <p>Estado de evaluación institucional: {r.evaluation_state ?? "sin registrar"}</p>
                   {r.notes && <p>Función inicial: {r.notes}</p>}
-                  <p>Disponibilidad: {r.file_path ? `archivo local (${r.file_path})` : r.url ? `enlace (${r.url})` : "sin archivo asociado todavía"}</p>
+                  <div className="flex items-center gap-2">
+                    <p>
+                      Disponibilidad:{" "}
+                      {r.file_path ? `archivo local (${r.file_path})` : r.url ? `enlace (${r.url})` : "sin archivo asociado todavía"}
+                    </p>
+                    {(r.file_path || r.url) && (
+                      <button
+                        onClick={() => void handleOpen(r)}
+                        className="shrink-0 rounded border border-accent px-2 py-0.5 text-xs uppercase tracking-wide text-accent hover:bg-accent/10"
+                      >
+                        Abrir
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-text-muted">Consultas registradas: {usageByResource.get(r.id) ?? 0}</p>
                 </div>
               )}
 
