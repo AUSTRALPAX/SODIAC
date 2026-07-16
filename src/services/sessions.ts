@@ -19,6 +19,8 @@ import type {
   StudySessionRow,
 } from "@/database/types";
 import { createTask } from "@/services/tasks";
+import { completeSubject, completeTaskOrMilestone, completeTopic } from "@/services/completionXp";
+import type { AwardXpResult } from "@/services/xp";
 
 const now = () => new Date().toISOString();
 
@@ -201,6 +203,18 @@ export async function recordComprobacion(
   return learningEvidenceRepo.insert(evidence);
 }
 
+/**
+ * XP directo por finalización (Fase B): marcar estos elementos al cerrar la
+ * sesión otorga XP inmediatamente vía `services/completionXp.ts` — sin
+ * exportar JSON ni pasar por ChatGPT (ver `services/evaluations.ts`, que
+ * sigue existiendo como acción aparte y opcional para trabajos importantes).
+ */
+export interface SessionCompletions {
+  completeTask?: boolean;
+  completeTopic?: boolean;
+  completeSubject?: boolean;
+}
+
 export interface FinalizeSessionInput {
   // Cierre mínimo obligatorio (prompt maestro §11) — nunca opcional.
   conclusion: string;
@@ -214,6 +228,15 @@ export interface FinalizeSessionInput {
   masteryExplanation?: string;
   needsReview?: boolean;
   reviewDueAt?: string | null;
+  completions?: SessionCompletions;
+}
+
+export interface FinalizeSessionXpAwarded {
+  task: AwardXpResult | null;
+  topic: AwardXpResult | null;
+  subject: AwardXpResult | null;
+  /** true si se pidió cerrar la materia pero todavía quedan temas pendientes. */
+  subjectGateBlocked: boolean;
 }
 
 export interface FinalizeSessionResult {
@@ -221,6 +244,7 @@ export interface FinalizeSessionResult {
   continuityPoint: ContinuityPointRow;
   mastery: MasteryAssessmentRow | null;
   review: ReviewRow | null;
+  xpAwarded: FinalizeSessionXpAwarded;
 }
 
 /**
@@ -317,8 +341,38 @@ export async function finalizeSession(
     await reviewsRepo.insert(review);
   }
 
+  const xpAwarded: FinalizeSessionXpAwarded = {
+    task: null,
+    topic: null,
+    subject: null,
+    subjectGateBlocked: false,
+  };
+
+  if (input.completions?.completeTask) {
+    const relatedTask = await getRelatedTaskForSession(sessionId);
+    if (relatedTask && !relatedTask.completed_at) {
+      xpAwarded.task = await completeTaskOrMilestone("task", relatedTask.id, session.subject_id, relatedTask.title);
+    }
+  }
+
+  if (input.completions?.completeTopic && session.topic_id) {
+    const relatedTopic = await topicsRepo.getById(session.topic_id);
+    if (relatedTopic && !relatedTopic.completed_at) {
+      xpAwarded.topic = await completeTopic(session.topic_id);
+    }
+  }
+
+  if (input.completions?.completeSubject && session.subject_id) {
+    const relatedSubject = await subjectsRepo.getById(session.subject_id);
+    if (relatedSubject && !relatedSubject.completed_at) {
+      const subjectResult = await completeSubject(session.subject_id);
+      xpAwarded.subject = subjectResult.result;
+      xpAwarded.subjectGateBlocked = !subjectResult.gate.eligible;
+    }
+  }
+
   const updated = await studySessionsRepo.getById(sessionId);
-  return { session: updated!, continuityPoint: continuityPointRow, mastery, review };
+  return { session: updated!, continuityPoint: continuityPointRow, mastery, review, xpAwarded };
 }
 
 /** Prompt estructurado listo para copiar en ChatGPT (Hoja de Ruta §13, ejemplo de comando). */

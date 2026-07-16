@@ -338,9 +338,9 @@ function AssignmentDetail({
             </h4>
             <button
               onClick={handleGeneratePackage}
-              className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent"
+              className="rounded border border-border px-2 py-1 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
             >
-              Generar
+              Evaluar trabajo con ChatGPT
             </button>
           </div>
           {packageText && (

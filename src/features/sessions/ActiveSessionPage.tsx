@@ -5,12 +5,20 @@ import {
   studyBlocksRepo,
   pomodoroCyclesRepo,
   competenciesRepo,
+  subjectsRepo,
   topicsRepo,
   studySessionsRepo,
 } from "@/database/entities";
-import type { CompetencyRow, StudyBlockRow, StudySessionRow, TopicRow } from "@/database/types";
-import { cancelSession, finalizeSession, recordComprobacion } from "@/services/sessions";
+import type { CompetencyRow, StudyBlockRow, StudySessionRow, SubjectRow, TaskRow, TopicRow } from "@/database/types";
+import { cancelSession, finalizeSession, getRelatedTaskForSession, recordComprobacion } from "@/services/sessions";
 import { getVaultPath, openVaultInObsidian } from "@/services/obsidian";
+import {
+  checkSubjectCompletionGate,
+  previewSubjectCompletion,
+  previewTaskCompletion,
+  previewTopicCompletion,
+  type SubjectCompletionGate,
+} from "@/services/completionXp";
 import {
   usePomodoro,
   DEFAULT_POMODORO_SETTINGS,
@@ -85,21 +93,47 @@ export function ActiveSessionPage() {
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const [vaultConfigured, setVaultConfigured] = useState(false);
 
+  // Fase B: XP directo al cerrar la sesión — sin exportar JSON ni pasar por ChatGPT.
+  const [relatedTask, setRelatedTask] = useState<TaskRow | null>(null);
+  const [subject, setSubject] = useState<SubjectRow | null>(null);
+  const [subjectGate, setSubjectGate] = useState<SubjectCompletionGate | null>(null);
+  const [taskXpPreview, setTaskXpPreview] = useState(0);
+  const [topicXpPreview, setTopicXpPreview] = useState(0);
+  const [subjectXpPreview, setSubjectXpPreview] = useState(0);
+  const [completeTaskChecked, setCompleteTaskChecked] = useState(false);
+  const [completeTopicChecked, setCompleteTopicChecked] = useState(false);
+  const [completeSubjectChecked, setCompleteSubjectChecked] = useState(false);
+
   const load = useCallback(async () => {
     if (!id) return;
     const row = await studySessionsRepo.getById(id);
     setSession(row);
     if (row) {
-      const [c, t, b, vault] = await Promise.all([
+      const [c, t, b, vault, task, subj] = await Promise.all([
         row.competency_id ? competenciesRepo.getById(row.competency_id) : Promise.resolve(null),
         row.topic_id ? topicsRepo.getById(row.topic_id) : Promise.resolve(null),
         studyBlocksRepo.list({ where: "study_session_id = ?", params: [row.id], orderBy: "created_at DESC" }),
         getVaultPath(),
+        getRelatedTaskForSession(row.id),
+        row.subject_id ? subjectsRepo.getById(row.subject_id) : Promise.resolve(null),
       ]);
       setCompetency(c);
       setTopic(t);
       setBlocks(b);
       setVaultConfigured(vault !== null);
+      setRelatedTask(task && !task.completed_at ? task : null);
+      setSubject(subj && !subj.completed_at ? subj : null);
+
+      const [taskPreview, topicPreview, subjectPreview, gate] = await Promise.all([
+        task && !task.completed_at ? previewTaskCompletion(task) : Promise.resolve(null),
+        t && !t.completed_at ? previewTopicCompletion(t) : Promise.resolve(null),
+        subj && !subj.completed_at ? previewSubjectCompletion(subj) : Promise.resolve(null),
+        row.subject_id ? checkSubjectCompletionGate(row.subject_id) : Promise.resolve(null),
+      ]);
+      setTaskXpPreview(taskPreview?.amount ?? 0);
+      setTopicXpPreview(topicPreview?.amount ?? 0);
+      setSubjectXpPreview(subjectPreview?.amount ?? 0);
+      setSubjectGate(gate);
     }
     setLoading(false);
   }, [id]);
@@ -188,6 +222,11 @@ export function ActiveSessionPage() {
               ...(masteryExplanation ? { masteryExplanation } : {}),
             }
           : {}),
+        completions: {
+          completeTask: completeTaskChecked,
+          completeTopic: completeTopicChecked,
+          completeSubject: completeSubjectChecked,
+        },
       });
       navigate("/sesiones");
     } catch (error) {
@@ -378,6 +417,69 @@ export function ActiveSessionPage() {
                 required
               />
             </Field>
+
+            {(relatedTask || topic || subject) && (
+              <div className="space-y-2 rounded border border-border-subtle bg-background/50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                  Marcar como completado
+                </p>
+                {relatedTask && (
+                  <label className="flex items-center justify-between gap-2 text-sm text-text-secondary">
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={completeTaskChecked}
+                        onChange={(e) => setCompleteTaskChecked(e.target.checked)}
+                      />
+                      Tarea: {relatedTask.title}
+                    </span>
+                    <span className="text-xs text-accent">+{Math.round(taskXpPreview)} XP</span>
+                  </label>
+                )}
+                {topic && !topic.completed_at && (
+                  <label className="flex items-center justify-between gap-2 text-sm text-text-secondary">
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={completeTopicChecked}
+                        onChange={(e) => setCompleteTopicChecked(e.target.checked)}
+                      />
+                      Tema: {topic.title}
+                    </span>
+                    <span className="text-xs text-accent">+{Math.round(topicXpPreview)} XP</span>
+                  </label>
+                )}
+                {subject && (
+                  <label
+                    className={`flex items-center justify-between gap-2 text-sm ${subjectGate?.eligible ? "text-text-secondary" : "text-text-muted"}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={completeSubjectChecked}
+                        disabled={!subjectGate?.eligible}
+                        onChange={(e) => setCompleteSubjectChecked(e.target.checked)}
+                      />
+                      Materia: {subject.title}
+                    </span>
+                    <span className="text-xs text-accent">
+                      {subjectGate?.eligible
+                        ? `+${Math.round(subjectXpPreview)} XP`
+                        : `${subjectGate?.pendingTopicCount ?? 0} tema(s) pendiente(s)`}
+                    </span>
+                  </label>
+                )}
+                <p className="text-right text-xs font-semibold text-text-primary">
+                  Total a recibir: +
+                  {Math.round(
+                    (completeTaskChecked ? taskXpPreview : 0) +
+                      (completeTopicChecked ? topicXpPreview : 0) +
+                      (completeSubjectChecked ? subjectXpPreview : 0),
+                  )}{" "}
+                  XP
+                </p>
+              </div>
+            )}
 
             {competency && (
               <Field label={`Nivel de dominio alcanzado — ${competency.title}`}>
