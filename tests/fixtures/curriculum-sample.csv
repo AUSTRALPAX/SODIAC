@@ -1,0 +1,15 @@
+type,code,parent_code,unit_code,fq_code,title,description,credits,budgeted_xp,estimated_minutes,scheduled_date,activity_type,orientative_duration,main_product,sort_order,version_label,total_xp_budget
+career,,,,,Currículo de prueba (fixture) [CSV],,,,,,,,,,v0-fixture-csv,100000
+stage,E0,,,,Etapa 0 (fixture),,,,,,,2 semanas,Diagnóstico inicial,0,,
+stage,E1,,,,Etapa 1 (fixture),,,,,,,4 semanas,Primer ensayo,1,,
+subject,M1,E0,,FQ0,Materia de prueba 1,,3,,,,,,,,,
+subject,M2,E1,,FQ0,Materia de prueba 2,,4,,,,,,,,,
+subject,M3,E1,,FQ0,Materia de prueba 3,,2,,,,,,,,,
+unit,U1,M1,,,Unidad 1 de M1,,,500,,,,,,,,
+unit,U2,M2,,,Unidad 1 de M2,,,800,,,,,,,,
+topic,T1,M1,U1,,Tema 1 de M1,,,,,,,,,,,
+topic,T2,M1,U1,,Tema 2 de M1,,,,,,,,,,,
+topic,T3,M2,U2,,Tema 1 de M2,,,,,,,,,,,
+topic,,M3,,,Tema suelto de M3,,,,,,,,,,,
+activity,,T1,,,Actividad 1 de T1,,,,45,2026-08-03,lectura,,,,,
+activity,,T3,,,Actividad 1 de T3,,,,30,2026-08-10,ejercicio,,,,,

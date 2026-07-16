@@ -1,0 +1,26 @@
+{
+  "career": { "title": "Currículo de prueba (fixture)", "versionLabel": "v0-fixture", "totalXpBudget": 100000 },
+  "stages": [
+    { "code": "E0", "title": "Etapa 0 (fixture)", "description": null, "orientativeDuration": "2 semanas", "mainProduct": "Diagnóstico inicial", "sortOrder": 0 },
+    { "code": "E1", "title": "Etapa 1 (fixture)", "description": null, "orientativeDuration": "4 semanas", "mainProduct": "Primer ensayo", "sortOrder": 1 }
+  ],
+  "subjects": [
+    { "code": "M1", "stageCode": "E0", "fundamentalQuestionCode": "FQ0", "title": "Materia de prueba 1", "description": null, "credits": 3 },
+    { "code": "M2", "stageCode": "E1", "fundamentalQuestionCode": "FQ0", "title": "Materia de prueba 2", "description": null, "credits": 4 },
+    { "code": "M3", "stageCode": "E1", "fundamentalQuestionCode": "FQ0", "title": "Materia de prueba 3", "description": null, "credits": 2 }
+  ],
+  "units": [
+    { "code": "U1", "subjectCode": "M1", "title": "Unidad 1 de M1", "description": null, "budgetedXp": 500 },
+    { "code": "U2", "subjectCode": "M2", "title": "Unidad 1 de M2", "description": null, "budgetedXp": 800 }
+  ],
+  "topics": [
+    { "code": "T1", "subjectCode": "M1", "unitCode": "U1", "title": "Tema 1 de M1", "description": null },
+    { "code": "T2", "subjectCode": "M1", "unitCode": "U1", "title": "Tema 2 de M1", "description": null },
+    { "code": "T3", "subjectCode": "M2", "unitCode": "U2", "title": "Tema 1 de M2", "description": null },
+    { "code": null, "subjectCode": "M3", "unitCode": null, "title": "Tema suelto de M3", "description": null }
+  ],
+  "activities": [
+    { "topicCode": "T1", "title": "Actividad 1 de T1", "activityType": "lectura", "estimatedMinutes": 45, "scheduledDate": "2026-08-03" },
+    { "topicCode": "T3", "title": "Actividad 1 de T3", "activityType": "ejercicio", "estimatedMinutes": 30, "scheduledDate": "2026-08-10" }
+  ]
+}
