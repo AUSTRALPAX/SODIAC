@@ -13,7 +13,8 @@ import {
   reopenTask,
   rescheduleTask,
 } from "@/services/tasks";
-import type { TaskRow } from "@/database/types";
+import { subjectsRepo, topicsRepo } from "@/database/entities";
+import type { SubjectRow, TaskRow, TopicRow } from "@/database/types";
 import { localDateInputToIso } from "@/utils/date";
 
 const PRIORITIES: TaskRow["priority"][] = ["baja", "media", "alta", "critica"];
@@ -32,15 +33,26 @@ const PRIORITY_COLOR: Record<TaskRow["priority"], string> = {
 
 export function PlanningPage() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [subjects, setSubjects] = useState<SubjectRow[]>([]);
+  const [topics, setTopics] = useState<TopicRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<TaskRow["priority"]>("media");
+  const [subjectId, setSubjectId] = useState("");
+  const [topicId, setTopicId] = useState("");
   const [creating, setCreating] = useState(false);
 
   const refresh = useCallback(async () => {
-    setTasks(await listAllTasks());
+    const [taskRows, subjectRows, topicRows] = await Promise.all([
+      listAllTasks(),
+      subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
+      topicsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
+    ]);
+    setTasks(taskRows);
+    setSubjects(subjectRows);
+    setTopics(topicRows);
     setLoading(false);
   }, []);
 
@@ -58,15 +70,21 @@ export function PlanningPage() {
         title: trimmed,
         due_at: dueDate ? localDateInputToIso(dueDate) : null,
         priority,
+        subject_id: subjectId || null,
+        topic_id: topicId || null,
       });
       setTitle("");
       setDueDate("");
       setPriority("media");
+      setSubjectId("");
+      setTopicId("");
       await refresh();
     } finally {
       setCreating(false);
     }
   }
+
+  const topicsForSubject = topics.filter((t) => t.subject_id === subjectId);
 
   async function handleToggle(task: TaskRow) {
     if (task.status === "completada") {
@@ -132,6 +150,36 @@ export function PlanningPage() {
               ))}
             </select>
           </div>
+          <div className="flex gap-2">
+            <select
+              value={subjectId}
+              onChange={(e) => {
+                setSubjectId(e.target.value);
+                setTopicId("");
+              }}
+              className="flex-1 rounded border border-border bg-background px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+            >
+              <option value="">Sin materia</option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
+            <select
+              value={topicId}
+              onChange={(e) => setTopicId(e.target.value)}
+              disabled={!subjectId}
+              className="flex-1 rounded border border-border bg-background px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none disabled:opacity-40"
+            >
+              <option value="">Sin tema</option>
+              {topicsForSubject.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             type="submit"
             disabled={creating || !title.trim()}
@@ -163,7 +211,12 @@ export function PlanningPage() {
                   <div className="flex shrink-0 gap-2">
                     {task.status !== "completada" && (
                       <Link
-                        to={`/sesiones/nueva?${new URLSearchParams({ taskId: task.id, objective: task.title }).toString()}`}
+                        to={`/sesiones/nueva?${new URLSearchParams({
+                          taskId: task.id,
+                          objective: task.title,
+                          ...(task.subject_id ? { subjectId: task.subject_id } : {}),
+                          ...(task.topic_id ? { topicId: task.topic_id } : {}),
+                        }).toString()}`}
                         className="rounded border border-accent px-2 py-1 text-xs text-accent"
                       >
                         Iniciar sesión

@@ -1,4 +1,5 @@
 import { taskHistoryRepo, tasksRepo } from "@/database/entities";
+import { completeTaskOrMilestone } from "@/services/completionXp";
 import type { TaskHistoryRow, TaskRow } from "@/database/types";
 
 /**
@@ -85,11 +86,18 @@ export async function rescheduleTask(id: string, newDueAt: string | null, reason
   await tasksRepo.update(id, { due_at: newDueAt });
 }
 
+/**
+ * Completar una tarea siempre pasa por el mismo motor de XP que usa el
+ * cierre de sesión (`completeTaskOrMilestone`) — así da lo mismo completarla
+ * desde Planificación, desde Proyectos o desde el modal de cierre de
+ * sesión: otorga XP idéntico si la tarea tiene `subject_id` (o ninguno si
+ * es una tarea administrativa sin materia).
+ */
 export async function completeTask(id: string): Promise<void> {
   const task = await tasksRepo.getById(id);
   if (!task) throw new Error("La tarea no existe.");
   await recordHistory(id, "status", task.status, "completada");
-  await tasksRepo.update(id, { status: "completada", completed_at: now() });
+  await completeTaskOrMilestone("task", id, task.subject_id, task.title);
 }
 
 export async function reopenTask(id: string): Promise<void> {

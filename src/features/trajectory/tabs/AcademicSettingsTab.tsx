@@ -1,21 +1,57 @@
 import { useCallback, useEffect, useState } from "react";
 import { subjectsRepo } from "@/database/entities";
-import { applySubjectXpBudgets, simulateSubjectXpBudgets, type SubjectXpBudget } from "@/services/xp";
+import {
+  CATEGORY_WEIGHTS,
+  COMPLETION_CATEGORY_WEIGHTS,
+  GRADED_SHARE,
+  COMPLETION_SHARE,
+  listSubjectXpBudgets,
+  type SubjectXpBudgetView,
+} from "@/services/xp";
 import { DEFAULT_IPA_WEIGHTS, updateIpaWeights, ensureCurrentFormulaVersion, type IpaWeights } from "@/services/progress";
 import type { SubjectRow } from "@/database/types";
 
+const GRADED_CATEGORY_LABEL: Record<string, string> = {
+  notas_conceptuales: "Notas conceptuales",
+  ejercicios_practicas: "Ejercicios y prácticas",
+  aplicaciones_casos: "Aplicaciones y casos",
+  proyecto_examen_integrador: "Proyecto o examen integrador",
+  hitos_dominio: "Hitos de dominio",
+  revision_diferida_retencion: "Revisión diferida (retención)",
+  intento: "Intento (no llega al mínimo académico)",
+};
+
+const COMPLETION_CATEGORY_LABEL: Record<string, string> = {
+  finalizacion_tarea_hito: "Completar una tarea o hito",
+  finalizacion_tema: "Completar un tema",
+  cierre_materia: "Cerrar una materia",
+};
+
+const SCORE_TIERS = [
+  { range: "90 – 100", pct: "100%" },
+  { range: "80 – 89", pct: "90%" },
+  { range: "70 – 79", pct: "78%" },
+  { range: "60 – 69", pct: "60%" },
+  { range: "50 – 59", pct: "35%" },
+  { range: "0 – 49", pct: "10%" },
+];
+
 export function AcademicSettingsTab({ onChanged }: { onChanged: () => void }) {
   const [subjects, setSubjects] = useState<SubjectRow[]>([]);
-  const [simulation, setSimulation] = useState<SubjectXpBudget[] | null>(null);
-  const [applying, setApplying] = useState(false);
+  const [budgets, setBudgets] = useState<SubjectXpBudgetView[]>([]);
   const [weights, setWeights] = useState<IpaWeights>(DEFAULT_IPA_WEIGHTS);
   const [weightsLabel, setWeightsLabel] = useState("");
   const [savingWeights, setSavingWeights] = useState(false);
   const [weightsError, setWeightsError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setSubjects(await subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }));
-    const formula = await ensureCurrentFormulaVersion();
+    const [subjectRows, budgetRows, formula] = await Promise.all([
+      subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
+      listSubjectXpBudgets(),
+      ensureCurrentFormulaVersion(),
+    ]);
+    setSubjects(subjectRows);
+    setBudgets(budgetRows);
     setWeights(JSON.parse(formula.weights_json));
   }, []);
 
@@ -26,23 +62,7 @@ export function AcademicSettingsTab({ onChanged }: { onChanged: () => void }) {
   async function handleCreditsChange(subjectId: string, credits: number) {
     await subjectsRepo.update(subjectId, { credits });
     await refresh();
-  }
-
-  async function handleSimulate() {
-    setSimulation(await simulateSubjectXpBudgets());
-  }
-
-  async function handleApply() {
-    if (!simulation) return;
-    setApplying(true);
-    try {
-      await applySubjectXpBudgets(simulation);
-      setSimulation(null);
-      await refresh();
-      onChanged();
-    } finally {
-      setApplying(false);
-    }
+    onChanged();
   }
 
   const weightsSum = weights.coverage + weights.mastery + weights.evidence + weights.retention + weights.projects;
@@ -70,8 +90,8 @@ export function AcademicSettingsTab({ onChanged }: { onChanged: () => void }) {
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Créditos por materia</h3>
         <p className="mt-1 text-xs text-text-muted">
-          Escala 1 (corta/complementaria) a 5 (troncal/integradora). Define el peso de cada materia al distribuir los
-          100.000 XP de la carrera.
+          Escala 1 (corta/complementaria) a 5 (troncal/integradora). Define el peso de cada materia al repartir los
+          100.000 XP de la carrera entre todas las materias activas.
         </p>
         <ul className="mt-2 divide-y divide-border-subtle rounded border border-border-subtle bg-surface">
           {subjects.map((s) => (
@@ -94,48 +114,91 @@ export function AcademicSettingsTab({ onChanged }: { onChanged: () => void }) {
       </section>
 
       <section>
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-            Presupuesto de XP por materia (100.000 XP totales)
-          </h3>
-          <button onClick={handleSimulate} className="rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:border-accent hover:text-accent">
-            Simular
-          </button>
-        </div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Presupuesto de XP por materia (100.000 XP totales, en vivo)
+        </h3>
+        <p className="mt-1 text-xs text-text-muted">
+          Se recalcula automáticamente cada vez que se agrega, se archiva o cambia los créditos de una materia — no
+          hace falta ningún paso manual. Si sumás una materia nueva, el resto vale un poco menos por crédito a partir
+          de ahora; el XP ya otorgado nunca cambia.
+        </p>
+        <table className="mt-3 w-full rounded border border-border-subtle bg-surface text-sm">
+          <thead>
+            <tr className="border-b border-border-subtle text-left text-xs uppercase tracking-wide text-text-muted">
+              <th className="px-3 py-2">Materia</th>
+              <th className="px-3 py-2">Créditos</th>
+              <th className="px-3 py-2">Trabajo calificado</th>
+              <th className="px-3 py-2">Finalización</th>
+              <th className="px-3 py-2">Total</th>
+              <th className="px-3 py-2">Ya ganado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {budgets.map((b) => (
+              <tr key={b.subjectId} className="border-b border-border-subtle last:border-0">
+                <td className="px-3 py-2 text-text-primary">{b.title}</td>
+                <td className="px-3 py-2 text-text-muted">{b.credits}</td>
+                <td className="px-3 py-2 text-text-secondary">{b.gradedBudget.toLocaleString("es-AR")}</td>
+                <td className="px-3 py-2 text-text-secondary">{b.completionBudget.toLocaleString("es-AR")}</td>
+                <td className="px-3 py-2 text-accent">{b.totalBudget.toLocaleString("es-AR")}</td>
+                <td className="px-3 py-2 text-text-muted">{Math.round(b.earnedXp).toLocaleString("es-AR")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
 
-        {simulation && (
-          <div className="mt-3">
-            <table className="w-full rounded border border-border-subtle bg-surface text-sm">
-              <thead>
-                <tr className="border-b border-border-subtle text-left text-xs uppercase tracking-wide text-text-muted">
-                  <th className="px-3 py-2">Materia</th>
-                  <th className="px-3 py-2">Actual</th>
-                  <th className="px-3 py-2">Propuesto</th>
-                  <th className="px-3 py-2">Ya otorgado</th>
-                </tr>
-              </thead>
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">¿Cómo se gana XP?</h3>
+        <p className="mt-1 text-xs text-text-muted">
+          El presupuesto de cada materia se reparte en dos pools independientes:{" "}
+          <span className="text-text-secondary">{Math.round(GRADED_SHARE * 100)}%</span> para trabajo calificado y{" "}
+          <span className="text-text-secondary">{Math.round(COMPLETION_SHARE * 100)}%</span> para completar tareas,
+          temas y materias directamente. Ninguno de los dos se puede exceder ni se resta si algo se reevalúa a la baja.
+        </p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold text-text-secondary">Trabajo calificado (evaluación asistida)</p>
+            <table className="mt-1 w-full rounded border border-border-subtle bg-surface text-xs">
               <tbody>
-                {simulation.map((b) => (
-                  <tr key={b.subjectId} className="border-b border-border-subtle last:border-0">
-                    <td className="px-3 py-2 text-text-primary">{b.title}</td>
-                    <td className="px-3 py-2 text-text-muted">{b.currentBudgetedXp ?? "sin asignar"}</td>
-                    <td className="px-3 py-2 text-accent">{b.proposedBudgetedXp.toLocaleString("es-AR")}</td>
-                    <td className="px-3 py-2 text-text-muted">
-                      {b.hasHistory ? `${Math.round(b.alreadyAwardedXp)} XP (ya tiene historial)` : "—"}
-                    </td>
+                {Object.entries(CATEGORY_WEIGHTS).map(([cat, weight]) => (
+                  <tr key={cat} className="border-b border-border-subtle last:border-0">
+                    <td className="px-2 py-1.5 text-text-secondary">{GRADED_CATEGORY_LABEL[cat] ?? cat}</td>
+                    <td className="px-2 py-1.5 text-right text-accent">{Math.round(weight * 100)}%</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <button
-              onClick={handleApply}
-              disabled={applying}
-              className="mt-2 rounded border border-accent bg-accent/10 px-3 py-1.5 text-xs uppercase tracking-wide text-accent disabled:opacity-40"
-            >
-              {applying ? "Aplicando…" : "Confirmar y aplicar"}
-            </button>
+            <p className="mt-2 text-xs font-semibold text-text-secondary">Multiplicador según la nota (0-100)</p>
+            <table className="mt-1 w-full rounded border border-border-subtle bg-surface text-xs">
+              <tbody>
+                {SCORE_TIERS.map((t) => (
+                  <tr key={t.range} className="border-b border-border-subtle last:border-0">
+                    <td className="px-2 py-1.5 text-text-secondary">{t.range}</td>
+                    <td className="px-2 py-1.5 text-right text-accent">{t.pct}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+          <div>
+            <p className="text-xs font-semibold text-text-secondary">Finalización directa (sin ChatGPT)</p>
+            <table className="mt-1 w-full rounded border border-border-subtle bg-surface text-xs">
+              <tbody>
+                {Object.entries(COMPLETION_CATEGORY_WEIGHTS).map(([cat, weight]) => (
+                  <tr key={cat} className="border-b border-border-subtle last:border-0">
+                    <td className="px-2 py-1.5 text-text-secondary">{COMPLETION_CATEGORY_LABEL[cat] ?? cat}</td>
+                    <td className="px-2 py-1.5 text-right text-accent">{Math.round(weight * 100)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-xs text-text-muted">
+              Cada porcentaje se reparte además entre todos los temas (o tareas/hitos) activos de la materia — si una
+              materia tiene 5 temas, cada uno recibe una quinta parte del presupuesto de "completar un tema".
+            </p>
+          </div>
+        </div>
       </section>
 
       <section>

@@ -422,6 +422,7 @@ export async function getUpcomingAgenda(): Promise<AgendaItem[]> {
 // ---------------------------------------------------------------------------
 
 export const DASHBOARD_WIDGET_IDS = [
+  "trayectoria",
   "resumen",
   "heatmap",
   "progreso",
@@ -448,8 +449,13 @@ const PREFS_KEY = "dashboard_prefs";
 export async function getDashboardPrefs(): Promise<DashboardPrefs> {
   const stored = await getSetting<DashboardPrefs>(PREFS_KEY);
   if (!stored) return DEFAULT_PREFS;
+  // Si se agrega un widget nuevo (p.ej. "trayectoria") después de que el
+  // usuario ya guardó un orden propio, se agrega al final en vez de quedar
+  // invisible para siempre — así un panel nuevo siempre aparece solo.
+  const storedOrder = stored.order?.length ? stored.order : DEFAULT_PREFS.order;
+  const missing = DASHBOARD_WIDGET_IDS.filter((id) => !storedOrder.includes(id));
   return {
-    order: stored.order?.length ? stored.order : DEFAULT_PREFS.order,
+    order: [...storedOrder, ...missing],
     hidden: stored.hidden ?? [],
     rangeDays: stored.rangeDays ?? 30,
   };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   academicTranscriptEntriesRepo,
@@ -25,7 +25,15 @@ import type {
   SubjectRow,
   TopicRow,
 } from "@/database/types";
-import { getSubjectXpTotal } from "@/services/xp";
+import { getSubjectXpBudgetTotal, getSubjectXpTotal } from "@/services/xp";
+import {
+  checkSubjectCompletionGate,
+  completeSubject,
+  completeTopic,
+  previewSubjectCompletion,
+  previewTopicCompletion,
+  type SubjectCompletionGate,
+} from "@/services/completionXp";
 
 interface SubjectDetail {
   subject: SubjectRow;
@@ -39,22 +47,24 @@ interface SubjectDetail {
   transcript: AcademicTranscriptEntryRow[];
   resources: ResourceRow[];
   xpObtained: number;
+  xpBudgetTotal: number;
 }
 
 export function SubjectDetailPage() {
   const { subjectId } = useParams<{ subjectId: string }>();
   const [detail, setDetail] = useState<SubjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gate, setGate] = useState<SubjectCompletionGate | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!subjectId) return;
-    void (async () => {
-      const subject = await subjectsRepo.getById(subjectId);
-      if (!subject) {
-        setLoading(false);
-        return;
-      }
-      const [stage, question, topics, units, projects, sessions, transcript, sources, xpObtained] = await Promise.all([
+    const subject = await subjectsRepo.getById(subjectId);
+    if (!subject) {
+      setLoading(false);
+      return;
+    }
+    const [stage, question, topics, units, projects, sessions, transcript, sources, xpObtained, xpBudget, subjectGate] =
+      await Promise.all([
         subject.learning_stage_id ? learningStagesRepo.getById(subject.learning_stage_id) : Promise.resolve(null),
         fundamentalQuestionsRepo.getById(subject.fundamental_question_id),
         topicsRepo.list({ where: "subject_id = ? AND archived_at IS NULL", params: [subjectId], orderBy: "sort_order" }),
@@ -64,38 +74,45 @@ export function SubjectDetailPage() {
         academicTranscriptEntriesRepo.list({ where: "subject_id = ? AND status = 'vigente'", params: [subjectId], orderBy: "recorded_at DESC" }),
         bibliographicSourcesRepo.list({ where: "subject_id = ?", params: [subjectId] }),
         getSubjectXpTotal(subjectId),
+        getSubjectXpBudgetTotal(subjectId),
+        checkSubjectCompletionGate(subjectId),
       ]);
 
-      const competencyIds = new Set(topics.map((t) => t.competency_id).filter((c): c is string => !!c));
-      const competencies = competencyIds.size > 0 ? await competenciesRepo.list({ where: "archived_at IS NULL" }) : [];
+    const competencyIds = new Set(topics.map((t) => t.competency_id).filter((c): c is string => !!c));
+    const competencies = competencyIds.size > 0 ? await competenciesRepo.list({ where: "archived_at IS NULL" }) : [];
 
-      const resourceIds = [...new Set(sources.map((s) => s.resource_id))];
-      const resources = resourceIds.length > 0 ? await Promise.all(resourceIds.map((id) => resourcesRepo.getById(id))) : [];
+    const resourceIds = [...new Set(sources.map((s) => s.resource_id))];
+    const resources = resourceIds.length > 0 ? await Promise.all(resourceIds.map((id) => resourcesRepo.getById(id))) : [];
 
-      setDetail({
-        subject,
-        stage,
-        question,
-        competencies: competencies.filter((c) => competencyIds.has(c.id)),
-        units,
-        topics,
-        projects,
-        sessions,
-        transcript,
-        resources: resources.filter((r): r is ResourceRow => r != null),
-        xpObtained: xpObtained,
-      });
-      setLoading(false);
-    })();
+    setDetail({
+      subject,
+      stage,
+      question,
+      competencies: competencies.filter((c) => competencyIds.has(c.id)),
+      units,
+      topics,
+      projects,
+      sessions,
+      transcript,
+      resources: resources.filter((r): r is ResourceRow => r != null),
+      xpObtained: xpObtained,
+      xpBudgetTotal: xpBudget.total,
+    });
+    setGate(subjectGate);
+    setLoading(false);
   }, [subjectId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   if (loading) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
   if (!detail) return <div className="p-10 text-sm text-danger">La materia indicada no existe.</div>;
 
-  const { subject, stage, question, competencies, units, topics, projects, sessions, transcript, resources, xpObtained } = detail;
+  const { subject, stage, question, competencies, units, topics, projects, sessions, transcript, resources, xpObtained, xpBudgetTotal } = detail;
   const completedTopics = topics.filter((t) => t.completed_at).length;
   const progressPct = topics.length > 0 ? Math.round((completedTopics / topics.length) * 100) : 0;
-  const xpTotal = (subject.budgeted_xp ?? 0) + (subject.completion_budgeted_xp ?? 0);
+  const xpTotal = xpBudgetTotal;
   const nextTopic = topics.find((t) => !t.completed_at);
   const average10 =
     transcript.length > 0 ? (transcript.reduce((sum, e) => sum + e.score_10, 0) / transcript.length).toFixed(1) : null;
@@ -148,6 +165,11 @@ export function SubjectDetailPage() {
             <p className="text-text-primary">{nextTopic ? nextTopic.title : subject.completed_at ? "Materia completada" : "—"}</p>
           </div>
         </div>
+        {!subject.completed_at && (
+          <div className="mt-3 border-t border-border-subtle pt-3">
+            <SubjectCompleteControl subject={subject} gate={gate} onReload={load} />
+          </div>
+        )}
       </section>
 
       <section>
@@ -156,12 +178,13 @@ export function SubjectDetailPage() {
           {units.map((unit) => (
             <li key={unit.id} className="rounded border border-border-subtle bg-surface p-3">
               <p className="text-sm text-text-primary">{unit.title}</p>
-              <ul className="mt-1 space-y-0.5 pl-3 text-xs text-text-secondary">
+              <ul className="mt-1 space-y-1 pl-3 text-xs text-text-secondary">
                 {topics
                   .filter((t) => t.curriculum_unit_id === unit.id)
                   .map((t) => (
-                    <li key={t.id}>
-                      · {t.title} {t.completed_at ? "✓" : ""}
+                    <li key={t.id} className="flex items-center justify-between gap-2">
+                      <span>· {t.title}</span>
+                      {t.completed_at ? <span className="text-success">✓</span> : <TopicCompleteInline topic={t} onReload={load} />}
                     </li>
                   ))}
               </ul>
@@ -170,12 +193,13 @@ export function SubjectDetailPage() {
           {topics.filter((t) => !t.curriculum_unit_id).length > 0 && (
             <li className="rounded border border-border-subtle bg-surface p-3">
               <p className="text-sm text-text-primary">Sin unidad asignada</p>
-              <ul className="mt-1 space-y-0.5 pl-3 text-xs text-text-secondary">
+              <ul className="mt-1 space-y-1 pl-3 text-xs text-text-secondary">
                 {topics
                   .filter((t) => !t.curriculum_unit_id)
                   .map((t) => (
-                    <li key={t.id}>
-                      · {t.title} {t.completed_at ? "✓" : ""}
+                    <li key={t.id} className="flex items-center justify-between gap-2">
+                      <span>· {t.title}</span>
+                      {t.completed_at ? <span className="text-success">✓</span> : <TopicCompleteInline topic={t} onReload={load} />}
                     </li>
                   ))}
               </ul>
@@ -240,5 +264,116 @@ export function SubjectDetailPage() {
         )}
       </section>
     </div>
+  );
+}
+
+function TopicCompleteInline({ topic, onReload }: { topic: TopicRow; onReload: () => void }) {
+  const [xpPreview, setXpPreview] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleShowPreview() {
+    setBusy(true);
+    try {
+      const preview = await previewTopicCompletion(topic);
+      setXpPreview(preview.amount);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleConfirm() {
+    setBusy(true);
+    try {
+      await completeTopic(topic.id);
+      onReload();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (xpPreview != null) {
+    return (
+      <span className="flex items-center gap-1">
+        <span className="text-accent">+{Math.round(xpPreview)} XP</span>
+        <button onClick={() => void handleConfirm()} disabled={busy} className="text-accent underline disabled:opacity-40">
+          Confirmar
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <button onClick={() => void handleShowPreview()} disabled={busy} className="text-text-muted hover:text-accent disabled:opacity-40">
+      Marcar completado
+    </button>
+  );
+}
+
+function SubjectCompleteControl({
+  subject,
+  gate,
+  onReload,
+}: {
+  subject: SubjectRow;
+  gate: SubjectCompletionGate | null;
+  onReload: () => void;
+}) {
+  const [xpPreview, setXpPreview] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleShowPreview() {
+    setBusy(true);
+    try {
+      const preview = await previewSubjectCompletion(subject);
+      setXpPreview(preview.amount);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleConfirm() {
+    setBusy(true);
+    try {
+      await completeSubject(subject.id);
+      onReload();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!gate?.eligible) {
+    return (
+      <p className="text-xs text-text-muted">
+        Para cerrar la materia todavía faltan {gate?.pendingTopicCount ?? 0} tema(s) por completar.
+      </p>
+    );
+  }
+
+  if (xpPreview != null) {
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-accent">Cerrar materia: +{Math.round(xpPreview)} XP</span>
+        <button
+          onClick={() => void handleConfirm()}
+          disabled={busy}
+          className="rounded border border-accent bg-accent/10 px-3 py-1.5 text-xs uppercase tracking-wide text-accent disabled:opacity-40"
+        >
+          {busy ? "Cerrando…" : "Confirmar"}
+        </button>
+        <button onClick={() => setXpPreview(null)} className="text-xs text-text-muted hover:text-text-primary">
+          Cancelar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => void handleShowPreview()}
+      disabled={busy}
+      className="rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent disabled:opacity-40"
+    >
+      Cerrar materia
+    </button>
   );
 }

@@ -1,4 +1,5 @@
 import { projectMilestonesRepo, projectsRepo } from "@/database/entities";
+import { completeTaskOrMilestone } from "@/services/completionXp";
 import type { ProjectMilestoneRow, ProjectRow } from "@/database/types";
 
 const now = () => new Date().toISOString();
@@ -45,12 +46,19 @@ export async function listMilestones(projectId: string): Promise<ProjectMileston
   return projectMilestonesRepo.list({ where: "project_id = ?", params: [projectId], orderBy: "sort_order" });
 }
 
+/**
+ * Completar un hito pasa por el mismo motor de XP que usa el cierre de
+ * sesión (`completeTaskOrMilestone`) — antes solo otorgaba XP si el hito se
+ * completaba desde ahí; ahora da lo mismo hacerlo desde Proyectos. Reabrir
+ * un hito nunca resta XP ya otorgado (por diseño), solo revierte el estado.
+ */
 export async function toggleMilestone(milestone: ProjectMilestoneRow): Promise<void> {
   if (milestone.status === "completado") {
     await projectMilestonesRepo.update(milestone.id, { status: "pendiente", completed_at: null });
-  } else {
-    await projectMilestonesRepo.update(milestone.id, { status: "completado", completed_at: now() });
+    return;
   }
+  const project = await projectsRepo.getById(milestone.project_id);
+  await completeTaskOrMilestone("milestone", milestone.id, project?.subject_id ?? null, milestone.title);
 }
 
 export async function closeProject(id: string): Promise<void> {

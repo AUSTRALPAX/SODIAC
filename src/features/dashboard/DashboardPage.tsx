@@ -39,6 +39,10 @@ import {
 } from "@/services/dashboard";
 import { getBlockDistribution, getSessionActivity, type BlockDistribution, type SessionActivityDay } from "@/services/statistics";
 import { MASTERY_LEVEL_COLOR, MASTERY_LEVEL_LABEL } from "@/services/mastery";
+import { getLevelProgress, type LevelProgress } from "@/services/xp";
+import { getNextRank, getRankForLevel } from "@/services/ranks";
+import { computeIpa } from "@/services/progress";
+import type { AcademicRankRow } from "@/database/types";
 
 const ONBOARDING_DISMISSED_KEY = "onboarding_dismissed";
 
@@ -53,6 +57,7 @@ const TOOLTIP_STYLE = {
 };
 
 const WIDGET_LABEL: Record<DashboardWidgetId, string> = {
+  trayectoria: "Trayectoria académica",
   resumen: "Resumen",
   heatmap: "Calendario de actividad",
   progreso: "Progreso académico",
@@ -297,6 +302,8 @@ export function DashboardPage() {
       <div className="space-y-10 p-10">
         {visibleOrder.map((id) => {
           switch (id) {
+            case "trayectoria":
+              return <TrayectoriaSection key={id} />;
             case "resumen":
               return summary && <SummarySection key={id} summary={summary} />;
             case "heatmap":
@@ -536,6 +543,74 @@ function TemporalSection({
             <div style={{ width: `${(blocks!.consolidacion / totalBlocks) * 100}%`, background: "#087F78" }} title={`Consolidación: ${blocks!.consolidacion}`} />
           </div>
         )}
+      </div>
+    </section>
+  );
+}
+
+function TrayectoriaSection() {
+  const [level, setLevel] = useState<LevelProgress | null>(null);
+  const [rank, setRank] = useState<AcademicRankRow | null>(null);
+  const [nextRank, setNextRank] = useState<AcademicRankRow | null>(null);
+  const [ipa, setIpa] = useState<number | null>(null);
+
+  useEffect(() => {
+    void getLevelProgress().then(async (lp) => {
+      setLevel(lp);
+      const [r, nr, ipaResult] = await Promise.all([
+        getRankForLevel(lp.level),
+        getNextRank(lp.level),
+        computeIpa({ kind: "career" }),
+      ]);
+      setRank(r);
+      setNextRank(nr);
+      setIpa(ipaResult.total);
+    });
+  }, []);
+
+  if (!level) return null;
+
+  return (
+    <section className="rounded border border-border-subtle bg-gradient-to-br from-surface to-surface-elevated p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-text-muted">Nivel {level.level}</p>
+          <h2 className="mt-1 font-display text-xl text-accent">{rank?.name ?? "Sin rango"}</h2>
+          {rank?.subtitle && <p className="text-xs text-text-secondary">{rank.subtitle}</p>}
+        </div>
+        <div className="flex gap-6 text-right text-xs text-text-muted">
+          {ipa != null && (
+            <div>
+              <p className="text-text-muted">IPA</p>
+              <p className="font-display text-lg text-text-primary">{(ipa * 100).toFixed(1)}%</p>
+            </div>
+          )}
+          {nextRank && (
+            <div>
+              <p className="text-text-muted">Próximo rango</p>
+              <p className="text-text-primary">{nextRank.name}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
+        <div className="h-full rounded-full bg-accent" style={{ width: `${level.percentOfLevel}%` }} />
+      </div>
+      <p className="mt-1 text-xs text-text-muted">
+        {Math.round(level.xpIntoLevel).toLocaleString("es-AR")} XP
+        {level.xpForNextLevel != null && ` de ${Math.round(level.xpForNextLevel - level.xpForCurrentLevel).toLocaleString("es-AR")}`}
+        {level.xpNeededForNextLevel != null &&
+          ` · faltan ${Math.round(level.xpNeededForNextLevel).toLocaleString("es-AR")} XP para el nivel ${level.level + 1}`}
+      </p>
+
+      <div className="mt-4 flex gap-3">
+        <Link to="/trajectory" className="rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent hover:bg-accent/10">
+          Ver trayectoria
+        </Link>
+        <Link to="/carrera" className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent">
+          Ver carrera
+        </Link>
       </div>
     </section>
   );

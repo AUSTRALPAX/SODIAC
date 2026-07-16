@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { subjectsRepo } from "@/database/entities";
 import { computeIpa } from "@/services/progress";
-import { getSubjectXpTotal } from "@/services/xp";
+import { getSubjectXpBudgetTotal, getSubjectXpTotal } from "@/services/xp";
 import type { SubjectRow } from "@/database/types";
 
 interface SubjectRowData {
   subject: SubjectRow;
   ipa: number;
   xp: number;
+  budgetTotal: number;
 }
 
 export function SubjectsProgressTab() {
@@ -19,11 +20,12 @@ export function SubjectsProgressTab() {
     const subjects = await subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" });
     const data: SubjectRowData[] = [];
     for (const subject of subjects) {
-      const [ipaResult, xp] = await Promise.all([
+      const [ipaResult, xp, budget] = await Promise.all([
         computeIpa({ kind: "subject", subjectId: subject.id }),
         getSubjectXpTotal(subject.id),
+        getSubjectXpBudgetTotal(subject.id),
       ]);
-      data.push({ subject, ipa: ipaResult.total, xp });
+      data.push({ subject, ipa: ipaResult.total, xp, budgetTotal: budget.total });
     }
     setRows(data);
     setLoading(false);
@@ -48,13 +50,11 @@ export function SubjectsProgressTab() {
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ subject, ipa, xp }) => (
+          {rows.map(({ subject, ipa, xp, budgetTotal }) => (
             <tr key={subject.id} className="border-b border-border-subtle last:border-0">
               <td className="px-3 py-2 text-text-primary">{subject.title}</td>
               <td className="px-3 py-2 text-text-secondary">{subject.credits}</td>
-              <td className="px-3 py-2 text-text-secondary">
-                {subject.budgeted_xp != null ? Math.round(subject.budgeted_xp).toLocaleString("es-AR") : "sin asignar"}
-              </td>
+              <td className="px-3 py-2 text-text-secondary">{Math.round(budgetTotal).toLocaleString("es-AR")}</td>
               <td className="px-3 py-2 text-text-secondary">{Math.round(xp).toLocaleString("es-AR")}</td>
               <td className="px-3 py-2">
                 <div className="flex items-center gap-2">

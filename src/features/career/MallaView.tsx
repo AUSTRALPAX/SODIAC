@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CareerData } from "./useCareerData";
-import { getSubjectXpTotal } from "@/services/xp";
+import { getSubjectXpBudgetTotal, getSubjectXpTotal } from "@/services/xp";
 
 export function MallaView({ data }: { data: CareerData }) {
   const [xpBySubject, setXpBySubject] = useState<Map<string, number>>(new Map());
+  const [budgetBySubject, setBudgetBySubject] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     void Promise.all(data.subjects.map((s) => getSubjectXpTotal(s.id).then((xp) => [s.id, xp] as const))).then((entries) => {
       setXpBySubject(new Map(entries));
+    });
+    void Promise.all(data.subjects.map((s) => getSubjectXpBudgetTotal(s.id).then((b) => [s.id, b.total] as const))).then((entries) => {
+      setBudgetBySubject(new Map(entries));
     });
   }, [data.subjects]);
 
@@ -23,7 +27,7 @@ export function MallaView({ data }: { data: CareerData }) {
         const mainCompetencyId = topics.find((t) => t.competency_id)?.competency_id;
         const mainCompetency = data.competencies.find((c) => c.id === mainCompetencyId);
         const obtained = xpBySubject.get(subject.id) ?? 0;
-        const total = (subject.budgeted_xp ?? 0) + (subject.completion_budgeted_xp ?? 0);
+        const total = budgetBySubject.get(subject.id) ?? 0;
 
         return (
           <Link

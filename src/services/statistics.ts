@@ -2,6 +2,70 @@ import { getDb } from "@/database/client";
 import { subjectsRepo, topicsRepo } from "@/database/entities";
 import { getLatestMasteryByCompetency } from "@/services/mastery";
 
+export interface XpEvolutionPoint {
+  day: string;
+  amount: number;
+  cumulative: number;
+}
+
+/** XP ganado por día en los últimos `days` — para ver el ritmo real, no solo el total acumulado. */
+export async function getXpEvolution(days = 30): Promise<XpEvolutionPoint[]> {
+  const db = await getDb();
+  const rows = await db.select<Array<{ day: string; amount: number }>>(
+    `SELECT date(date) as day, SUM(amount) as amount
+     FROM xp_event
+     WHERE date(date) >= date('now', ?)
+     GROUP BY day
+     ORDER BY day ASC`,
+    [`-${days} days`],
+  );
+  const priorTotal = await db.select<Array<{ total: number }>>(
+    `SELECT COALESCE(SUM(amount),0) as total FROM xp_event WHERE date(date) < date('now', ?)`,
+    [`-${days} days`],
+  );
+
+  const byDay = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    byDay.set(d.toISOString().slice(0, 10), 0);
+  }
+  for (const row of rows) byDay.set(row.day, row.amount);
+
+  let cumulative = priorTotal[0]?.total ?? 0;
+  return [...byDay.entries()].map(([day, amount]) => {
+    cumulative += amount;
+    return { day, amount: Math.round(amount), cumulative: Math.round(cumulative) };
+  });
+}
+
+export interface SubjectCompletionRate {
+  subjectTitle: string;
+  totalTopics: number;
+  completedTopics: number;
+  completionPct: number;
+}
+
+/** % de temas completados por materia — el mismo `completed_at` que usa Carrera, no un dato aparte. */
+export async function getSubjectCompletionRates(): Promise<SubjectCompletionRate[]> {
+  const [subjects, topics] = await Promise.all([
+    subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
+    topicsRepo.list({ where: "archived_at IS NULL" }),
+  ]);
+  return subjects
+    .map((subject) => {
+      const subjectTopics = topics.filter((t) => t.subject_id === subject.id);
+      const completed = subjectTopics.filter((t) => t.completed_at).length;
+      return {
+        subjectTitle: subject.title,
+        totalTopics: subjectTopics.length,
+        completedTopics: completed,
+        completionPct: subjectTopics.length > 0 ? Math.round((completed / subjectTopics.length) * 100) : 0,
+      };
+    })
+    .filter((r) => r.totalTopics > 0);
+}
+
 export interface SessionActivityDay {
   day: string;
   formal: number;

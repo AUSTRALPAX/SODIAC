@@ -16,12 +16,19 @@ import {
   getMasteryEvolution,
   getReviewStats,
   getSessionActivity,
+  getSubjectCompletionRates,
+  getXpEvolution,
   type BlockDistribution,
   type MasteryEvolutionPoint,
   type ReviewStats,
   type SessionActivityDay,
   type SubjectBottleneck,
+  type SubjectCompletionRate,
+  type XpEvolutionPoint,
 } from "@/services/statistics";
+import { getLevelProgress, type LevelProgress } from "@/services/xp";
+import { getRankForLevel } from "@/services/ranks";
+import type { AcademicRankRow } from "@/database/types";
 
 const AXIS_COLOR = "#6F7980";
 const GRID_COLOR = "#1D2328";
@@ -43,6 +50,10 @@ export function StatisticsPage() {
   const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null);
   const [blocks, setBlocks] = useState<BlockDistribution | null>(null);
   const [bottlenecks, setBottlenecks] = useState<SubjectBottleneck[]>([]);
+  const [xpEvolution, setXpEvolution] = useState<XpEvolutionPoint[]>([]);
+  const [completionRates, setCompletionRates] = useState<SubjectCompletionRate[]>([]);
+  const [levelProgress, setLevelProgress] = useState<LevelProgress | null>(null);
+  const [rank, setRank] = useState<AcademicRankRow | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,12 +63,19 @@ export function StatisticsPage() {
       getReviewStats(),
       getBlockDistribution(),
       getBottlenecks(5),
-    ]).then(([a, m, r, b, bo]) => {
+      getXpEvolution(30),
+      getSubjectCompletionRates(),
+      getLevelProgress(),
+    ]).then(async ([a, m, r, b, bo, xp, cr, lp]) => {
       setActivity(a);
       setMastery(m);
       setReviewStats(r);
       setBlocks(b);
       setBottlenecks(bo);
+      setXpEvolution(xp);
+      setCompletionRates(cr);
+      setLevelProgress(lp);
+      setRank(await getRankForLevel(lp.level));
       setLoading(false);
     });
   }, []);
@@ -80,6 +98,65 @@ export function StatisticsPage() {
           <StatTile label="Enfriados" value={reviewStats.enfriados} />
         </section>
       )}
+
+      {levelProgress && (
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile label="Nivel actual" value={levelProgress.level} tone="accent" />
+          <div className="rounded border border-border-subtle bg-surface p-3">
+            <p className="font-display text-2xl text-text-primary">{rank?.name ?? "—"}</p>
+            <p className="mt-0.5 text-xs text-text-muted">Rango actual</p>
+          </div>
+          <StatTile label="XP total" value={Math.round(levelProgress.xpTotal)} />
+          <StatTile label="% del nivel" value={Math.round(levelProgress.percentOfLevel)} />
+        </section>
+      )}
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          XP ganado (últimos 30 días)
+        </h2>
+        <p className="text-xs text-text-muted">Ritmo real de experiencia — no confundir con tiempo estudiado.</p>
+        <div className="mt-3 h-56 rounded border border-border-subtle bg-surface p-3">
+          {xpEvolution.every((p) => p.amount === 0) ? (
+            <p className="flex h-full items-center justify-center text-sm text-text-muted">
+              Todavía no se otorgó XP en este período.
+            </p>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={xpEvolution}>
+                <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                <XAxis dataKey="day" tickFormatter={formatDay} stroke={AXIS_COLOR} fontSize={11} />
+                <YAxis stroke={AXIS_COLOR} fontSize={11} allowDecimals={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(d) => formatDay(String(d))} />
+                <Line type="monotone" dataKey="cumulative" stroke="#00D6C5" strokeWidth={2} dot={false} name="XP acumulado" />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          Temas completados por materia
+        </h2>
+        <p className="text-xs text-text-muted">Mismo dato que Carrera — un tema marcado ahí se refleja acá también.</p>
+        <ul className="mt-3 divide-y divide-border-subtle rounded border border-border-subtle bg-surface">
+          {completionRates.length === 0 && <li className="p-3 text-sm text-text-muted">Sin materias con temas todavía.</li>}
+          {completionRates.map((c) => (
+            <li key={c.subjectTitle} className="p-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-text-primary">{c.subjectTitle}</span>
+                <span className="text-xs text-text-muted">
+                  {c.completedTopics}/{c.totalTopics} temas ({c.completionPct}%)
+                </span>
+              </div>
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-background">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${c.completionPct}%` }} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">

@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { completeTopic, previewTopicCompletion } from "@/services/completionXp";
+import type { TopicRow } from "@/database/types";
 import type { CareerData } from "./useCareerData";
 
 export function TemarioView({ data }: { data: CareerData }) {
@@ -30,7 +33,7 @@ export function TemarioView({ data }: { data: CareerData }) {
                         {unit.budgeted_xp != null ? ` · ${unit.budgeted_xp} XP` : ""}
                       </span>
                     </summary>
-                    <TopicList topics={topics} activities={data.activities} />
+                    <TopicList topics={topics} activities={data.activities} onReload={data.reload} />
                   </details>
                 );
               })}
@@ -40,7 +43,7 @@ export function TemarioView({ data }: { data: CareerData }) {
                     Temas sin unidad asignada
                     <span className="ml-2 text-xs text-text-muted">{topicsWithoutUnit.length}</span>
                   </summary>
-                  <TopicList topics={topicsWithoutUnit} activities={data.activities} />
+                  <TopicList topics={topicsWithoutUnit} activities={data.activities} onReload={data.reload} />
                 </details>
               )}
             </div>
@@ -51,7 +54,15 @@ export function TemarioView({ data }: { data: CareerData }) {
   );
 }
 
-function TopicList({ topics, activities }: { topics: CareerData["topics"]; activities: CareerData["activities"] }) {
+function TopicList({
+  topics,
+  activities,
+  onReload,
+}: {
+  topics: CareerData["topics"];
+  activities: CareerData["activities"];
+  onReload: () => void;
+}) {
   return (
     <ul className="divide-y divide-border-subtle border-t border-border-subtle">
       {topics.map((topic) => {
@@ -63,7 +74,7 @@ function TopicList({ topics, activities }: { topics: CareerData["topics"]; activ
               {topic.completed_at ? (
                 <span className="text-xs text-success">Completado</span>
               ) : (
-                <span className="text-xs text-text-muted">Pendiente</span>
+                <TopicCompleteControl topic={topic} onReload={onReload} />
               )}
             </div>
             {topicActivities.length > 0 && (
@@ -83,5 +94,59 @@ function TopicList({ topics, activities }: { topics: CareerData["topics"]; activ
       })}
       {topics.length === 0 && <li className="px-3 py-2 text-xs text-text-muted">Sin temas todavía.</li>}
     </ul>
+  );
+}
+
+function TopicCompleteControl({ topic, onReload }: { topic: TopicRow; onReload: () => void }) {
+  const [xpPreview, setXpPreview] = useState<number | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [completing, setCompleting] = useState(false);
+
+  async function handleShowPreview() {
+    setLoadingPreview(true);
+    try {
+      const preview = await previewTopicCompletion(topic);
+      setXpPreview(preview.amount);
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
+  async function handleConfirm() {
+    setCompleting(true);
+    try {
+      await completeTopic(topic.id);
+      onReload();
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  if (xpPreview != null) {
+    return (
+      <span className="flex items-center gap-2 text-xs">
+        <span className="text-accent">+{Math.round(xpPreview)} XP</span>
+        <button
+          onClick={() => void handleConfirm()}
+          disabled={completing}
+          className="rounded border border-accent px-2 py-0.5 uppercase tracking-wide text-accent disabled:opacity-40"
+        >
+          {completing ? "Marcando…" : "Confirmar"}
+        </button>
+        <button onClick={() => setXpPreview(null)} className="text-text-muted hover:text-text-primary">
+          Cancelar
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => void handleShowPreview()}
+      disabled={loadingPreview}
+      className="rounded border border-border px-2 py-0.5 text-xs text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+    >
+      {loadingPreview ? "…" : "Marcar completado"}
+    </button>
   );
 }

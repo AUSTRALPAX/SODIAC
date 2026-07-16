@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   competenciesRepo,
   curriculumActivitiesRepo,
@@ -27,6 +27,8 @@ export interface CareerData {
   topics: TopicRow[];
   activities: CurriculumActivityRow[];
   loading: boolean;
+  /** Vuelve a leer todo desde la base — llamar después de marcar algo como completado. */
+  reload: () => void;
 }
 
 /**
@@ -35,7 +37,7 @@ export interface CareerData {
  * separada del currículo, solo una lectura distinta de los mismos repos.
  */
 export function useCareerData(): CareerData {
-  const [data, setData] = useState<Omit<CareerData, "loading">>({
+  const [data, setData] = useState<Omit<CareerData, "loading" | "reload">>({
     questions: [],
     competencies: [],
     stages: [],
@@ -46,7 +48,8 @@ export function useCareerData(): CareerData {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     void Promise.all([
       fundamentalQuestionsRepo.list({ where: "archived_at IS NULL", orderBy: "sort_order" }),
       competenciesRepo.list({ where: "archived_at IS NULL", orderBy: "code" }),
@@ -61,5 +64,9 @@ export function useCareerData(): CareerData {
     });
   }, []);
 
-  return { ...data, loading };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return { ...data, loading, reload: load };
 }

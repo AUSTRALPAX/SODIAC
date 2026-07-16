@@ -1,19 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CareerData } from "./useCareerData";
-import { getSubjectXpTotal } from "@/services/xp";
-
-function subjectTotalXp(subjectId: string, data: CareerData): number {
-  const s = data.subjects.find((x) => x.id === subjectId);
-  return (s?.budgeted_xp ?? 0) + (s?.completion_budgeted_xp ?? 0);
-}
+import { getSubjectXpBudgetTotal, getSubjectXpTotal } from "@/services/xp";
 
 export function RecorridoView({ data }: { data: CareerData }) {
   const [xpBySubject, setXpBySubject] = useState<Map<string, number>>(new Map());
+  const [budgetBySubject, setBudgetBySubject] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     void Promise.all(data.subjects.map((s) => getSubjectXpTotal(s.id).then((xp) => [s.id, xp] as const))).then((entries) => {
       setXpBySubject(new Map(entries));
+    });
+    void Promise.all(data.subjects.map((s) => getSubjectXpBudgetTotal(s.id).then((b) => [s.id, b.total] as const))).then((entries) => {
+      setBudgetBySubject(new Map(entries));
     });
   }, [data.subjects]);
 
@@ -38,7 +37,7 @@ export function RecorridoView({ data }: { data: CareerData }) {
                 const completedTopics = topics.filter((t) => t.completed_at).length;
                 const progressPct = topics.length > 0 ? Math.round((completedTopics / topics.length) * 100) : 0;
                 const obtained = xpBySubject.get(subject.id) ?? 0;
-                const total = subjectTotalXp(subject.id, data);
+                const total = budgetBySubject.get(subject.id) ?? 0;
                 return (
                   <li key={subject.id}>
                     <Link

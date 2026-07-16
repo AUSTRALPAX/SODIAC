@@ -57,90 +57,73 @@ export function scoreMultiplier(score100: number): number {
 }
 
 /**
- * XP_materia = 100000 * peso_materia / suma_pesos_de_todas_las_materias (prompt
- * maestro §12). Usa `credits` (1-5) como peso. No se ejecuta automáticamente:
- * requiere una llamada explícita (simulación + confirmación en la UI) para no
- * "modificar silenciosamente los eventos anteriores" de materias que ya
- * otorgaron XP.
+ * XP_materia = techo * peso_materia / suma_pesos_de_todas_las_materias
+ * ACTIVAS (prompt maestro §12), usando `credits` (1-5) como peso. Se calcula
+ * en vivo en cada otorgamiento y en cada pantalla que lo muestra — nunca se
+ * guarda en `subject.budgeted_xp`/`completion_budgeted_xp` (esas columnas
+ * quedan sin uso a partir de esta versión). Esto es deliberado: si mañana se
+ * agrega o archiva una materia, el reparto de TODAS las demás se ajusta
+ * automáticamente la próxima vez que se otorgue o se muestre XP, sin ningún
+ * paso manual — y sin tocar los eventos de XP ya otorgados, que son
+ * inmutables (solo cambia cuánto se otorga a partir de ahora).
  */
-export interface SubjectXpBudget {
+export function computeSubjectBudgetShare(
+  subject: SubjectRow,
+  activeSubjects: SubjectRow[],
+): { graded: number; completion: number } {
+  const totalCredits = activeSubjects.reduce((sum, s) => sum + s.credits, 0) || 1;
+  const share = subject.credits / totalCredits;
+  return {
+    graded: CAREER_TOTAL_XP * GRADED_SHARE * share,
+    completion: CAREER_TOTAL_XP * COMPLETION_SHARE * share,
+  };
+}
+
+export interface SubjectXpBudgetView {
   subjectId: string;
   title: string;
   credits: number;
-  currentBudgetedXp: number | null;
-  proposedBudgetedXp: number;
-  alreadyAwardedXp: number;
-  hasHistory: boolean;
+  gradedBudget: number;
+  completionBudget: number;
+  totalBudget: number;
+  earnedXp: number;
 }
 
-export async function simulateSubjectXpBudgets(): Promise<SubjectXpBudget[]> {
-  const subjects = await subjectsRepo.list({ where: "archived_at IS NULL" });
-  const totalCredits = subjects.reduce((sum, s) => sum + s.credits, 0) || 1;
+/** Reparto vigente de todas las materias activas — siempre en vivo, nunca un valor guardado. */
+export async function listSubjectXpBudgets(): Promise<SubjectXpBudgetView[]> {
+  const subjects = await subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" });
   const events = await xpEventsRepo.list();
 
   return subjects.map((s) => {
-    const alreadyAwardedXp = events
-      .filter((e) => e.subject_id === s.id)
-      .reduce((sum, e) => sum + e.amount, 0);
+    const { graded, completion } = computeSubjectBudgetShare(s, subjects);
+    const earnedXp = events.filter((e) => e.subject_id === s.id).reduce((sum, e) => sum + e.amount, 0);
     return {
       subjectId: s.id,
       title: s.title,
       credits: s.credits,
-      currentBudgetedXp: s.budgeted_xp,
-      proposedBudgetedXp: Math.round((CAREER_TOTAL_XP * s.credits) / totalCredits),
-      alreadyAwardedXp,
-      hasHistory: alreadyAwardedXp > 0,
+      gradedBudget: Math.round(graded),
+      completionBudget: Math.round(completion),
+      totalBudget: Math.round(graded + completion),
+      earnedXp,
     };
   });
 }
 
-/** Aplica la simulación — requiere confirmación explícita desde la UI. */
-export async function applySubjectXpBudgets(budgets: SubjectXpBudget[]): Promise<void> {
-  for (const b of budgets) {
-    await subjectsRepo.update(b.subjectId, { budgeted_xp: b.proposedBudgetedXp });
-  }
-}
-
-/**
- * Hermana de `simulateSubjectXpBudgets` para el presupuesto de finalización
- * (30 % del techo de carrera, ver `COMPLETION_SHARE`). Nunca toca
- * `budgeted_xp` — es un pool aditivo e independiente.
- */
-export async function simulateCompletionXpBudgets(): Promise<SubjectXpBudget[]> {
+/** Presupuesto vigente de una materia puntual — mismo cálculo que usa `awardXp`. */
+export async function getSubjectXpBudgetTotal(subjectId: string): Promise<{ graded: number; completion: number; total: number }> {
   const subjects = await subjectsRepo.list({ where: "archived_at IS NULL" });
-  const totalCredits = subjects.reduce((sum, s) => sum + s.credits, 0) || 1;
-  const events = await xpEventsRepo.list();
-  const completionTotalXp = CAREER_TOTAL_XP * COMPLETION_SHARE;
-
-  return subjects.map((s) => {
-    const alreadyAwardedXp = events
-      .filter((e) => e.subject_id === s.id && isCompletionCategory(e.category))
-      .reduce((sum, e) => sum + e.amount, 0);
-    return {
-      subjectId: s.id,
-      title: s.title,
-      credits: s.credits,
-      currentBudgetedXp: s.completion_budgeted_xp,
-      proposedBudgetedXp: Math.round((completionTotalXp * s.credits) / totalCredits),
-      alreadyAwardedXp,
-      hasHistory: alreadyAwardedXp > 0,
-    };
-  });
+  const subject = subjects.find((s) => s.id === subjectId);
+  if (!subject) return { graded: 0, completion: 0, total: 0 };
+  const { graded, completion } = computeSubjectBudgetShare(subject, subjects);
+  return { graded, completion, total: graded + completion };
 }
 
-export async function applyCompletionXpBudgets(budgets: SubjectXpBudget[]): Promise<void> {
-  for (const b of budgets) {
-    await subjectsRepo.update(b.subjectId, { completion_budgeted_xp: b.proposedBudgetedXp });
-  }
-}
-
-function categoryBudgetForSubject(subject: SubjectRow, category: XpCategory): number {
+function categoryBudgetForSubject(subject: SubjectRow, activeSubjects: SubjectRow[], category: XpCategory): number {
+  const { graded, completion } = computeSubjectBudgetShare(subject, activeSubjects);
   if (isCompletionCategory(category)) {
-    const budget = subject.completion_budgeted_xp ?? 0;
-    return budget * COMPLETION_CATEGORY_WEIGHTS[category];
+    return completion * COMPLETION_CATEGORY_WEIGHTS[category];
   }
-  const budget = subject.budgeted_xp ?? 0;
-  return budget * CATEGORY_WEIGHTS[category];
+  return graded * CATEGORY_WEIGHTS[category];
 }
 
 export interface AwardXpInput {
@@ -187,9 +170,10 @@ async function computeXpPreview(input: AwardXpInput): Promise<{
   let proposedAmount = 0;
   const multiplier = scoreMultiplier(input.score100);
   if (input.subjectId) {
-    const subject = await subjectsRepo.getById(input.subjectId);
+    const activeSubjects = await subjectsRepo.list({ where: "archived_at IS NULL" });
+    const subject = activeSubjects.find((s) => s.id === input.subjectId);
     if (subject) {
-      const categoryBudget = categoryBudgetForSubject(subject, input.category);
+      const categoryBudget = categoryBudgetForSubject(subject, activeSubjects, input.category);
       const items = Math.max(1, input.itemsSharingCategory ?? 1);
       proposedAmount = (categoryBudget / items) * multiplier;
     }
