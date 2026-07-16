@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists, stat } from "@tauri-apps/plugin-fs";
 import {
@@ -10,9 +11,12 @@ import {
 } from "@/services/backup";
 import { exportAllAsJson, exportEntityAsCsv, EXPORTABLE_TABLES } from "@/services/export";
 import { importInstitutionalSeed, type SeedImportSummary } from "@/services/seedImport";
+import { getVaultPath, listIndexedNotes } from "@/services/obsidian";
+import { enableSafeMode, isSafeModeEnabled } from "@/services/safeMode";
 import type { BackupRecordRow } from "@/database/types";
 
-const APP_VERSION = "0.1.0";
+/** Debe coincidir con `identifier` en src-tauri/tauri.conf.json — no hay API de Tauri para leerlo en vivo desde el frontend. */
+const APP_IDENTIFIER = "com.sodiac.desktop";
 
 function formatBytes(bytes: number | null): string {
   if (bytes === null) return "—";
@@ -27,10 +31,14 @@ function formatDate(iso: string | null): string {
 }
 
 export function SettingsPage() {
+  const [appVersion, setAppVersion] = useState<string>("…");
   const [dataDir, setDataDir] = useState<string>("");
   const [dbPath, setDbPath] = useState<string>("");
   const [dbSize, setDbSize] = useState<number | null>(null);
   const [dbExists, setDbExists] = useState(false);
+  const [vaultPath, setVaultPath] = useState<string | null>(null);
+  const [noteCount, setNoteCount] = useState<number | null>(null);
+  const [safeModeQueued, setSafeModeQueued] = useState(isSafeModeEnabled());
 
   const [backups, setBackups] = useState<BackupRecordRow[]>([]);
   const [backupBusy, setBackupBusy] = useState<string | null>(null);
@@ -44,10 +52,18 @@ export function SettingsPage() {
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   const refreshSystemStatus = useCallback(async () => {
-    const dir = await appDataDir();
+    const [dir, version, vault, notes] = await Promise.all([
+      appDataDir(),
+      getVersion(),
+      getVaultPath(),
+      listIndexedNotes(),
+    ]);
     const dbFile = await join(dir, "sodiac.db");
     setDataDir(dir);
     setDbPath(dbFile);
+    setAppVersion(version);
+    setVaultPath(vault);
+    setNoteCount(notes.length);
     const dbThere = await exists(dbFile);
     setDbExists(dbThere);
     setDbSize(dbThere ? (await stat(dbFile)).size : null);
@@ -149,7 +165,9 @@ export function SettingsPage() {
         </h2>
         <dl className="mt-3 grid grid-cols-[160px_1fr] gap-y-2 rounded border border-border-subtle bg-surface p-4 text-sm">
           <dt className="text-text-muted">Versión</dt>
-          <dd>{APP_VERSION}</dd>
+          <dd>{appVersion}</dd>
+          <dt className="text-text-muted">Identificador</dt>
+          <dd className="text-text-secondary">{APP_IDENTIFIER}</dd>
           <dt className="text-text-muted">Ruta de datos</dt>
           <dd className="break-all text-text-secondary">{dataDir || "…"}</dd>
           <dt className="text-text-muted">Base de datos</dt>
@@ -157,9 +175,9 @@ export function SettingsPage() {
             {dbPath || "…"} {dbExists ? `(${formatBytes(dbSize)})` : "(aún no creada)"}
           </dd>
           <dt className="text-text-muted">Vault de Obsidian</dt>
-          <dd className="text-text-muted">No configurado — Fase 6</dd>
+          <dd className="break-all text-text-secondary">{vaultPath ?? "No configurado"}</dd>
           <dt className="text-text-muted">Notas indexadas</dt>
-          <dd className="text-text-muted">0 — integración con Obsidian pendiente (Fase 6)</dd>
+          <dd className="text-text-secondary">{noteCount ?? "…"}</dd>
           <dt className="text-text-muted">Último backup</dt>
           <dd>{backups[0] ? formatDate(backups[0].created_at) : "ninguno todavía"}</dd>
           <dt className="text-text-muted">Integridad</dt>
@@ -171,6 +189,18 @@ export function SettingsPage() {
               Comprobar ahora
             </button>{" "}
             {integrityResult && <span className="text-text-secondary">{integrityResult}</span>}
+          </dd>
+          <dt className="text-text-muted">Modo seguro</dt>
+          <dd>
+            <button
+              onClick={() => {
+                enableSafeMode(!safeModeQueued);
+                setSafeModeQueued(!safeModeQueued);
+              }}
+              className="rounded border border-border px-2 py-0.5 text-xs text-text-secondary hover:border-accent hover:text-accent"
+            >
+              {safeModeQueued ? "Desactivar (activado para el próximo inicio)" : "Activar para el próximo inicio"}
+            </button>
           </dd>
         </dl>
       </section>

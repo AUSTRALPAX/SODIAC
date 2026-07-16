@@ -24,6 +24,7 @@ import {
   type ObsidianOpenResult,
   type SyncDiagnostics,
 } from "@/services/obsidian";
+import { isSafeModeEnabled } from "@/services/safeMode";
 import type { ObsidianNoteRow, ObsidianPermissionMode } from "@/database/types";
 
 const SYNC_STATE_LABEL: Record<ObsidianNoteRow["sync_state"], string> = {
@@ -94,6 +95,7 @@ export function ObsidianPage() {
 
   useEffect(() => {
     if (!vaultPath) return;
+    if (isSafeModeEnabled()) return; // Modo seguro: no reconstruir el índice ni sincronizar al abrir.
     let unlisten: (() => void) | undefined;
     void startVaultWatcher();
     void onVaultChanged(() => void refresh()).then((fn) => {

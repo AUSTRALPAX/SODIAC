@@ -1,6 +1,26 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::{Emitter, Manager};
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 mod vault_watcher;
+
+/// Cierre seguro de ventana (H4): el frontend puede tener un autoguardado
+/// debounced pendiente (borrador de "Finalizar estudio") cuando el usuario
+/// cierra la app. En vez de cerrar de inmediato, se intercepta el cierre,
+/// se le pide al frontend que flushee ese guardado, y solo cuando confirma
+/// (vía `confirm_app_close`) se deja pasar el cierre real.
+#[derive(Default)]
+struct CloseState {
+    allow_close: AtomicBool,
+}
+
+#[tauri::command]
+fn confirm_app_close(app: tauri::AppHandle, state: tauri::State<CloseState>) {
+    state.allow_close.store(true, Ordering::SeqCst);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.close();
+    }
+}
 
 fn migrations() -> Vec<Migration> {
     vec![
@@ -69,15 +89,72 @@ fn migrations() -> Vec<Migration> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
+    let mut builder = tauri::Builder::default();
+
+    // Instancia única: debe registrarse antes que cualquier otro plugin.
+    // Cuando el usuario hace doble clic mientras SODIAC ya está corriendo,
+    // en vez de abrir una segunda ventana, se enfoca y restaura la existente.
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            log::info!("Segunda instancia detectada — redirigiendo foco a la ventana existente.");
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
             }
+        }));
+    }
+
+    builder
+        .setup(|app| {
+            // Logging persistente en AppLog — antes solo se activaba en debug;
+            // sin esto, un release que no llega a abrir ventana o crashea no
+            // deja ningún rastro (cierre silencioso).
+            let mut log_targets = vec![tauri_plugin_log::Target::new(
+                tauri_plugin_log::TargetKind::LogDir { file_name: None },
+            )];
+            if cfg!(debug_assertions) {
+                log_targets.push(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                ));
+            }
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .targets(log_targets)
+                    .build(),
+            )?;
+
+            log::info!(
+                "SODIAC iniciando — versión {}, identificador {}",
+                app.package_info().version,
+                app.config().identifier,
+            );
+
+            // Panic hook: un panic de Rust hoy hace desaparecer el proceso sin
+            // dejar rastro. Se registra en el mismo directorio de logs antes de
+            // que el proceso termine, para poder diagnosticar un cierre silencioso.
+            if let Ok(log_dir) = app.path().app_log_dir() {
+                let _ = std::fs::create_dir_all(&log_dir);
+                let panic_log_path = log_dir.join("panic.log");
+                std::panic::set_hook(Box::new(move |info| {
+                    log::error!("PANIC: {info}");
+                    use std::io::Write;
+                    if let Ok(mut file) = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&panic_log_path)
+                    {
+                        let elapsed = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        let _ = writeln!(file, "[unix_ts={elapsed}] PANIC: {info}\n---");
+                    }
+                }));
+            }
+
             Ok(())
         })
         .plugin(
@@ -89,10 +166,26 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .manage(vault_watcher::WatcherState::default())
+        .manage(CloseState::default())
         .invoke_handler(tauri::generate_handler![
             vault_watcher::start_vault_watcher,
             vault_watcher::stop_vault_watcher,
+            confirm_app_close,
         ])
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let state = window.state::<CloseState>();
+                if state.allow_close.load(Ordering::SeqCst) {
+                    return;
+                }
+                api.prevent_close();
+                log::info!("Cierre de ventana interceptado — solicitando flush de guardados pendientes al frontend.");
+                let _ = window.emit("sodiac://flush-before-close", ());
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

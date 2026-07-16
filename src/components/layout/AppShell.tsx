@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { SodiacLogo } from "@/components/brand/SodiacLogo";
 import { NAV_ITEMS } from "./navigation";
 import { CommandPalette } from "./CommandPalette";
+import { SessionRecoveryBanner } from "@/features/sessions/SessionRecoveryBanner";
 
 export function AppShell() {
   return (
@@ -40,6 +41,7 @@ export function AppShell() {
         </div>
       </aside>
       <main className="flex-1 overflow-y-auto">
+        <SessionRecoveryBanner />
         <Outlet />
       </main>
       <CommandPalette />

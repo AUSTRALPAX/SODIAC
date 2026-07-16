@@ -83,12 +83,44 @@ function buildGraph(data: CurriculumData, hiddenTypes: Set<MapEntityType>, colla
   return { nodes, edges: validEdges };
 }
 
+/**
+ * Panel de completitud (H6): a partir de los mismos datos ya cargados por
+ * useCurriculumData, sin consultas nuevas — el diagnóstico previo
+ * (docs/STARTUP_PERSISTENCE_MAP_DIAGNOSIS.md) confirmó que lo que falta en
+ * el Mapa es dato cargado, no código; este panel hace visible esa brecha.
+ */
+function computeCompleteness(data: CurriculumData) {
+  const topicsWithoutUnit = data.topics.filter((t) => !t.curriculum_unit_id).length;
+  const topicsWithoutCompetency = data.topics.filter((t) => !t.competency_id).length;
+  const subjectsWithoutQuestion = data.subjects.filter((s) => !s.fundamental_question_id).length;
+  const counts: Record<MapEntityType, number> = {
+    fundamental_question: data.questions.length,
+    competency: data.competencies.length,
+    subject: data.subjects.length,
+    curriculum_unit: data.units.length,
+    topic: data.topics.length,
+    project: data.projects.length,
+    obsidian_note: 0,
+    resource: 0,
+  };
+  return {
+    counts,
+    alerts: [
+      topicsWithoutUnit > 0 ? `${topicsWithoutUnit} tema(s) sin unidad curricular` : null,
+      topicsWithoutCompetency > 0 ? `${topicsWithoutCompetency} tema(s) sin competencia` : null,
+      subjectsWithoutQuestion > 0 ? `${subjectsWithoutQuestion} materia(s) sin pregunta fundamental` : null,
+    ].filter((x): x is string => x !== null),
+  };
+}
+
 export function RelationsView({ data }: { data: CurriculumData }) {
   const [hiddenTypes, setHiddenTypes] = useState<Set<MapEntityType>>(new Set());
   const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<SelectedEntity | null>(null);
   const [showLegend, setShowLegend] = useState(true);
+  const [showCompleteness, setShowCompleteness] = useState(true);
+  const completeness = useMemo(() => computeCompleteness(data), [data]);
 
   const { nodes: rawNodes, edges: rawEdges } = useMemo(
     () => buildGraph(data, hiddenTypes, collapsedSubjects),
@@ -211,6 +243,41 @@ export function RelationsView({ data }: { data: CurriculumData }) {
               </ul>
             )}
             <p className="text-[10px] text-text-muted">Doble clic en una materia colapsa/expande sus temas.</p>
+          </div>
+        </Panel>
+
+        <Panel position="top-right">
+          <div className="w-64 space-y-2 rounded border border-border bg-surface-elevated p-3">
+            <button
+              onClick={() => setShowCompleteness((s) => !s)}
+              className="text-xs uppercase tracking-wide text-text-secondary hover:text-accent"
+            >
+              {showCompleteness ? "Ocultar completitud" : "Ver completitud"}
+            </button>
+            {showCompleteness && (
+              <>
+                <ul className="space-y-0.5 text-xs text-text-secondary">
+                  {RENDERED_TYPES.map((type) => (
+                    <li key={type} className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: TYPE_COLOR[type] }} />
+                        {TYPE_LABEL[type]}
+                      </span>
+                      <span className="tabular-nums text-text-primary">{completeness.counts[type]}</span>
+                    </li>
+                  ))}
+                </ul>
+                {completeness.alerts.length > 0 ? (
+                  <ul className="space-y-1 border-t border-border-subtle pt-2 text-[11px] text-warning">
+                    {completeness.alerts.map((alert) => (
+                      <li key={alert}>⚠ {alert}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="border-t border-border-subtle pt-2 text-[11px] text-success">Sin brechas detectadas.</p>
+                )}
+              </>
+            )}
           </div>
         </Panel>
       </ReactFlow>

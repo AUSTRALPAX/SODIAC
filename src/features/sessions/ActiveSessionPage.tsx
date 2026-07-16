@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   studyBlocksRepo,
@@ -10,7 +10,14 @@ import {
   studySessionsRepo,
 } from "@/database/entities";
 import type { CompetencyRow, StudyBlockRow, StudySessionRow, SubjectRow, TaskRow, TopicRow } from "@/database/types";
-import { cancelSession, finalizeSession, getRelatedTaskForSession, recordComprobacion } from "@/services/sessions";
+import {
+  cancelSession,
+  finalizeSession,
+  getRelatedTaskForSession,
+  recordComprobacion,
+  saveSessionDraft,
+} from "@/services/sessions";
+import { registerPendingSave } from "@/services/closeGuard";
 import { getVaultPath, openVaultInObsidian } from "@/services/obsidian";
 import {
   checkSubjectCompletionGate,
@@ -63,6 +70,7 @@ function formatElapsed(startedAt: string, nowMs: number): string {
 export function ActiveSessionPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [session, setSession] = useState<StudySessionRow | null>(null);
   const [competency, setCompetency] = useState<CompetencyRow | null>(null);
@@ -92,6 +100,12 @@ export function ActiveSessionPage() {
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const [vaultConfigured, setVaultConfigured] = useState(false);
+
+  // Autoguardado del cierre en curso (H3): permite recuperar el texto si la
+  // app se cierra antes de confirmar "Finalizar estudio".
+  const [draftStatus, setDraftStatus] = useState<"idle" | "guardando" | "guardado" | "error">("idle");
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fase B: XP directo al cerrar la sesión — sin exportar JSON ni pasar por ChatGPT.
   const [relatedTask, setRelatedTask] = useState<TaskRow | null>(null);
@@ -143,6 +157,18 @@ export function ActiveSessionPage() {
   }, [load]);
 
   useEffect(() => {
+    const state = location.state as { autoFinalize?: boolean } | null;
+    if (!state?.autoFinalize || !session) return;
+    setConclusion(session.conclusion ?? "");
+    setEvidenceSummary(session.evidence_summary ?? "");
+    setNextAction(session.next_action ?? "");
+    setContinuityPoint(session.continuity_point ?? "");
+    setShowFinalize(true);
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
@@ -168,6 +194,50 @@ export function ActiveSessionPage() {
   );
 
   const pomodoro = usePomodoro(DEFAULT_POMODORO_SETTINGS, onPhaseComplete);
+
+  useEffect(() => {
+    if (!session || !showFinalize) return;
+    if (!conclusion.trim() && !evidenceSummary.trim() && !nextAction.trim() && !continuityPoint.trim()) return;
+
+    if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+    setDraftStatus("guardando");
+    draftTimeoutRef.current = setTimeout(() => {
+      void saveSessionDraft(session.id, {
+        conclusion,
+        evidenceSummary,
+        nextAction,
+        continuityPoint,
+      })
+        .then(() => {
+          setDraftStatus("guardado");
+          setDraftSavedAt(new Date());
+        })
+        .catch(() => setDraftStatus("error"));
+    }, 1500);
+
+    return () => {
+      if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+    };
+  }, [session, showFinalize, conclusion, evidenceSummary, nextAction, continuityPoint]);
+
+  const draftValuesRef = useRef({ conclusion, evidenceSummary, nextAction, continuityPoint });
+  useEffect(() => {
+    draftValuesRef.current = { conclusion, evidenceSummary, nextAction, continuityPoint };
+  });
+
+  useEffect(() => {
+    if (!session || !showFinalize) return;
+    return registerPendingSave(async () => {
+      const v = draftValuesRef.current;
+      if (!v.conclusion.trim() && !v.evidenceSummary.trim() && !v.nextAction.trim() && !v.continuityPoint.trim()) return;
+      await saveSessionDraft(session.id, {
+        conclusion: v.conclusion,
+        evidenceSummary: v.evidenceSummary,
+        nextAction: v.nextAction,
+        continuityPoint: v.continuityPoint,
+      });
+    });
+  }, [session, showFinalize]);
 
   async function handleSaveNote() {
     if (!session || !noteText.trim()) return;
@@ -351,7 +421,16 @@ export function ActiveSessionPage() {
         <button onClick={() => setShowComprobar(true)} className="rounded border border-accent px-4 py-2 text-sm uppercase tracking-wide text-accent">
           Comprobar
         </button>
-        <button onClick={() => setShowFinalize(true)} className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent">
+        <button
+          onClick={() => {
+            setConclusion(session.conclusion ?? "");
+            setEvidenceSummary(session.evidence_summary ?? "");
+            setNextAction(session.next_action ?? "");
+            setContinuityPoint(session.continuity_point ?? "");
+            setShowFinalize(true);
+          }}
+          className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent"
+        >
           Finalizar estudio
         </button>
         <button onClick={handleCancel} className="rounded border border-danger px-4 py-2 text-sm text-danger">
@@ -528,13 +607,21 @@ export function ActiveSessionPage() {
             )}
 
             {finalizeError && <p className="text-xs text-danger">{finalizeError}</p>}
-            <button
-              type="submit"
-              disabled={finalizing}
-              className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent disabled:opacity-40"
-            >
-              {finalizing ? "Cerrando…" : "Cerrar sesión"}
-            </button>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-text-muted">
+                {draftStatus === "guardando" && "Guardando…"}
+                {draftStatus === "guardado" &&
+                  `Guardado${draftSavedAt ? ` · ${draftSavedAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
+                {draftStatus === "error" && <span className="text-danger">Error al guardar el borrador</span>}
+              </p>
+              <button
+                type="submit"
+                disabled={finalizing}
+                className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent disabled:opacity-40"
+              >
+                {finalizing ? "Cerrando…" : "Cerrar sesión"}
+              </button>
+            </div>
           </form>
         </Modal>
       )}

@@ -178,6 +178,29 @@ export interface ComprobacionInput {
   response: string;
 }
 
+export interface SessionDraftInput {
+  conclusion?: string;
+  evidenceSummary?: string;
+  nextAction?: string;
+  continuityPoint?: string;
+}
+
+/**
+ * Autoguardado del cierre en curso (corrección de persistencia/recuperación,
+ * H3): escribe las mismas columnas que `finalizeSession` fija al cerrar,
+ * pero sin tocar `closure_status` ni `ended_at` — la sesión sigue `en_curso`
+ * hasta que el usuario confirma el cierre. Permite recuperar el texto
+ * escrito si la app se cierra inesperadamente antes de finalizar.
+ */
+export async function saveSessionDraft(sessionId: string, input: SessionDraftInput): Promise<void> {
+  await studySessionsRepo.update(sessionId, {
+    conclusion: input.conclusion ?? null,
+    evidence_summary: input.evidenceSummary ?? null,
+    next_action: input.nextAction ?? null,
+    continuity_point: input.continuityPoint ?? null,
+  });
+}
+
 /** Protocolo COMPROBAR (Hoja de Ruta §10): produce una LearningEvidence vinculada. */
 export async function recordComprobacion(
   sessionId: string,
