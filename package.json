@@ -30,6 +30,7 @@
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@tauri-apps/plugin-sql": "^2.2.0",
     "cmdk": "^1.0.4",
+    "dagre": "^0.8.5",
     "js-yaml": "^5.2.1",
     "lucide-react": "^0.469.0",
     "pdfjs-dist": "^4.10.38",
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0",
+    "@types/dagre": "^0.7.54",
     "@types/js-yaml": "^4.0.9",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
