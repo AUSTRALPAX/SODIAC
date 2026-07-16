@@ -46,6 +46,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/0007_academic_updated_at_columns.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "completion_xp",
+            sql: include_str!("../../migrations/0008_completion_xp.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

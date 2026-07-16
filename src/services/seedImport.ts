@@ -180,6 +180,8 @@ export async function importInstitutionalSeed(): Promise<SeedImportSummary> {
         estimated_load: 3,
         is_mandatory: 1,
         budgeted_xp: null,
+        completed_at: null,
+        completion_budgeted_xp: null,
       }),
     );
     subjectIdByCode.set(s.code, id);
@@ -202,6 +204,7 @@ export async function importInstitutionalSeed(): Promise<SeedImportSummary> {
         learning_stage_id: stageId,
         title: t.title,
         description: null,
+        completed_at: null,
         sort_order: 0,
         status: "activo",
         notes: null,

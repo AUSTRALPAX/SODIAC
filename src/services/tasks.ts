@@ -18,6 +18,9 @@ export interface NewTaskInput {
   task_type?: TaskRow["task_type"];
   project_id?: string | null;
   study_session_id?: string | null;
+  subject_id?: string | null;
+  topic_id?: string | null;
+  milestone_id?: string | null;
 }
 
 export async function createTask(input: NewTaskInput): Promise<TaskRow> {
@@ -30,6 +33,9 @@ export async function createTask(input: NewTaskInput): Promise<TaskRow> {
     task_type: input.task_type ?? "estudio",
     project_id: input.project_id ?? null,
     study_session_id: input.study_session_id ?? null,
+    subject_id: input.subject_id ?? null,
+    topic_id: input.topic_id ?? null,
+    milestone_id: input.milestone_id ?? null,
     completed_at: null,
     status: "pendiente",
     sort_order: 0,

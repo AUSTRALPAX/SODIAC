@@ -43,6 +43,8 @@ export interface SubjectRow extends BaseRow {
   estimated_load: number;
   is_mandatory: number;
   budgeted_xp: number | null;
+  completed_at: string | null;
+  completion_budgeted_xp: number | null;
 }
 
 export interface TopicRow extends BaseRow {
@@ -51,6 +53,7 @@ export interface TopicRow extends BaseRow {
   learning_stage_id: string | null;
   title: string;
   description: string | null;
+  completed_at: string | null;
 }
 
 export interface CurriculumDependencyRow {
@@ -229,6 +232,9 @@ export interface TaskRow extends BaseRow {
   task_type: "estudio" | "administrativo" | "proyecto" | "otro";
   project_id: string | null;
   study_session_id: string | null;
+  subject_id: string | null;
+  topic_id: string | null;
+  milestone_id: string | null;
   completed_at: string | null;
 }
 
@@ -541,6 +547,8 @@ export interface AcademicTranscriptEntryRow {
   updated_at: string;
 }
 
+export type CompletionXpCategory = "finalizacion_tarea_hito" | "finalizacion_tema" | "cierre_materia";
+
 export type XpCategory =
   | "notas_conceptuales"
   | "ejercicios_practicas"
@@ -548,7 +556,8 @@ export type XpCategory =
   | "proyecto_examen_integrador"
   | "hitos_dominio"
   | "revision_diferida_retencion"
-  | "intento";
+  | "intento"
+  | CompletionXpCategory;
 
 export interface XpEventRow {
   id: string;

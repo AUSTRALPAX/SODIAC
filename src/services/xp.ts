@@ -3,7 +3,7 @@ import {
   subjectsRepo,
   xpEventsRepo,
 } from "@/database/entities";
-import type { SubjectRow, XpCategory, XpEventRow } from "@/database/types";
+import type { CompletionXpCategory, SubjectRow, XpCategory, XpEventRow } from "@/database/types";
 
 const now = () => new Date().toISOString();
 
@@ -14,7 +14,7 @@ export const MAX_LEVEL = 100;
  * Distribución interna del presupuesto de XP de una materia (prompt maestro §13).
  * Las notas conceptuales nunca pueden consumir más del 10 %.
  */
-export const CATEGORY_WEIGHTS: Record<XpCategory, number> = {
+export const CATEGORY_WEIGHTS: Record<Exclude<XpCategory, CompletionXpCategory>, number> = {
   notas_conceptuales: 0.10,
   ejercicios_practicas: 0.20,
   aplicaciones_casos: 0.25,
@@ -23,6 +23,28 @@ export const CATEGORY_WEIGHTS: Record<XpCategory, number> = {
   revision_diferida_retencion: 0.05,
   intento: 0, // "intento" no tiene presupuesto propio: se descuenta del presupuesto de su categoría real
 };
+
+/**
+ * Segundo presupuesto de XP, independiente del de trabajo calificado
+ * (`budgeted_xp` / `CATEGORY_WEIGHTS`): otorga XP directamente al finalizar
+ * tareas/hitos, temas o materias desde el cierre de una sesión, sin pasar
+ * por rúbrica ni ChatGPT. Ambos presupuestos se derivan del mismo techo de
+ * carrera (`CAREER_TOTAL_XP`) pero nunca se mezclan ni se restan entre sí:
+ * modificar uno no afecta los eventos ya otorgados por el otro.
+ */
+export const GRADED_SHARE = 0.7;
+export const COMPLETION_SHARE = 0.3;
+
+/** Distribución dentro del presupuesto de finalización de una materia. */
+export const COMPLETION_CATEGORY_WEIGHTS: Record<CompletionXpCategory, number> = {
+  finalizacion_tarea_hito: 0.20,
+  finalizacion_tema: 0.60,
+  cierre_materia: 0.20,
+};
+
+function isCompletionCategory(category: XpCategory): category is CompletionXpCategory {
+  return category in COMPLETION_CATEGORY_WEIGHTS;
+}
 
 /** Multiplicador por calificación (prompt maestro §14) — nunca supera 100 %. */
 export function scoreMultiplier(score100: number): number {
@@ -79,7 +101,44 @@ export async function applySubjectXpBudgets(budgets: SubjectXpBudget[]): Promise
   }
 }
 
+/**
+ * Hermana de `simulateSubjectXpBudgets` para el presupuesto de finalización
+ * (30 % del techo de carrera, ver `COMPLETION_SHARE`). Nunca toca
+ * `budgeted_xp` — es un pool aditivo e independiente.
+ */
+export async function simulateCompletionXpBudgets(): Promise<SubjectXpBudget[]> {
+  const subjects = await subjectsRepo.list({ where: "archived_at IS NULL" });
+  const totalCredits = subjects.reduce((sum, s) => sum + s.credits, 0) || 1;
+  const events = await xpEventsRepo.list();
+  const completionTotalXp = CAREER_TOTAL_XP * COMPLETION_SHARE;
+
+  return subjects.map((s) => {
+    const alreadyAwardedXp = events
+      .filter((e) => e.subject_id === s.id && isCompletionCategory(e.category))
+      .reduce((sum, e) => sum + e.amount, 0);
+    return {
+      subjectId: s.id,
+      title: s.title,
+      credits: s.credits,
+      currentBudgetedXp: s.completion_budgeted_xp,
+      proposedBudgetedXp: Math.round((completionTotalXp * s.credits) / totalCredits),
+      alreadyAwardedXp,
+      hasHistory: alreadyAwardedXp > 0,
+    };
+  });
+}
+
+export async function applyCompletionXpBudgets(budgets: SubjectXpBudget[]): Promise<void> {
+  for (const b of budgets) {
+    await subjectsRepo.update(b.subjectId, { completion_budgeted_xp: b.proposedBudgetedXp });
+  }
+}
+
 function categoryBudgetForSubject(subject: SubjectRow, category: XpCategory): number {
+  if (isCompletionCategory(category)) {
+    const budget = subject.completion_budgeted_xp ?? 0;
+    return budget * COMPLETION_CATEGORY_WEIGHTS[category];
+  }
   const budget = subject.budgeted_xp ?? 0;
   return budget * CATEGORY_WEIGHTS[category];
 }
@@ -102,13 +161,20 @@ export interface AwardXpResult {
   alreadyAwardedForKey: number;
 }
 
-/**
- * Otorga XP de forma idempotente: la clave sourceType+sourceId+xpCategory+version
- * (prompt maestro §13) impide XP duplicado. Una reevaluación del mismo trabajo
- * solo puede otorgar la diferencia positiva pendiente — nunca se resta XP ya
- * otorgado (el dominio puede bajar; el XP histórico, no).
- */
-export async function awardXp(input: AwardXpInput): Promise<AwardXpResult> {
+export interface PreviewXpResult {
+  idempotencyKey: string;
+  proposedAmount: number;
+  alreadyAwardedForKey: number;
+  /** Diferencia positiva pendiente — lo que realmente se otorgaría al confirmar. */
+  diff: number;
+}
+
+async function computeXpPreview(input: AwardXpInput): Promise<{
+  idempotencyKey: string;
+  existingForKey: XpEventRow[];
+  alreadyAwardedForKey: number;
+  proposedAmount: number;
+}> {
   const version = input.rubricVersionId ?? "sin_rubrica";
   const idempotencyKey = `${input.sourceType}:${input.sourceId}:${input.category}:${version}`;
 
@@ -129,6 +195,28 @@ export async function awardXp(input: AwardXpInput): Promise<AwardXpResult> {
     }
   }
 
+  return { idempotencyKey, existingForKey, alreadyAwardedForKey, proposedAmount };
+}
+
+/**
+ * Calcula cuánto XP otorgaría `awardXp(input)` sin escribir nada — para
+ * mostrar una previsualización ("+140 XP") antes de que el usuario confirme.
+ */
+export async function previewAwardXp(input: AwardXpInput): Promise<PreviewXpResult> {
+  const { idempotencyKey, alreadyAwardedForKey, proposedAmount } = await computeXpPreview(input);
+  const diff = Math.max(0, proposedAmount - alreadyAwardedForKey);
+  return { idempotencyKey, proposedAmount, alreadyAwardedForKey, diff };
+}
+
+/**
+ * Otorga XP de forma idempotente: la clave sourceType+sourceId+xpCategory+version
+ * (prompt maestro §13) impide XP duplicado. Una reevaluación del mismo trabajo
+ * solo puede otorgar la diferencia positiva pendiente — nunca se resta XP ya
+ * otorgado (el dominio puede bajar; el XP histórico, no).
+ */
+export async function awardXp(input: AwardXpInput): Promise<AwardXpResult> {
+  const { idempotencyKey, existingForKey, alreadyAwardedForKey, proposedAmount } = await computeXpPreview(input);
+
   const diff = proposedAmount - alreadyAwardedForKey;
   if (diff <= 0) {
     return { event: null, awardedAmount: 0, alreadyAwardedForKey };
@@ -147,7 +235,7 @@ export async function awardXp(input: AwardXpInput): Promise<AwardXpResult> {
     category: input.category,
     reason: input.reason,
     score: input.score100,
-    multiplier,
+    multiplier: scoreMultiplier(input.score100),
     rubric_version_id: input.rubricVersionId ?? null,
     idempotency_key: finalKey,
     reversal_of: null,
