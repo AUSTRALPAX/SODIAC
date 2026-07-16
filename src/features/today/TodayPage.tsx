@@ -4,7 +4,11 @@ import { SodiacLogo } from "@/components/brand/SodiacLogo";
 import { recommendNextAction, type Recommendation } from "@/services/recommendation";
 import { completeTask, createTask, listActiveTasks } from "@/services/tasks";
 import { getInProgressSession } from "@/services/sessions";
+import { getSetting, setSetting } from "@/services/settings";
+import { subjectsRepo } from "@/database/entities";
 import type { StudySessionRow, TaskRow } from "@/database/types";
+
+const ONBOARDING_DISMISSED_KEY = "onboarding_dismissed";
 
 function formatDue(iso: string | null): string {
   if (!iso) return "sin fecha";
@@ -33,22 +37,31 @@ export function TodayPage() {
   const [loading, setLoading] = useState(true);
   const [quickTitle, setQuickTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [rec, activeTasks, active] = await Promise.all([
+    const [rec, activeTasks, active, subjects, dismissed] = await Promise.all([
       recommendNextAction(),
       listActiveTasks(),
       getInProgressSession(),
+      subjectsRepo.list(),
+      getSetting<boolean>(ONBOARDING_DISMISSED_KEY),
     ]);
     setRecommendation(rec);
     setTasks(activeTasks);
     setInProgressSession(active);
+    setShowOnboarding(subjects.length === 0 && !dismissed);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  async function handleDismissOnboarding() {
+    setShowOnboarding(false);
+    await setSetting(ONBOARDING_DISMISSED_KEY, true);
+  }
 
   async function handleQuickAdd(e: FormEvent) {
     e.preventDefault();
@@ -127,6 +140,25 @@ export function TodayPage() {
 
       <div className="grid gap-8 p-10 md:grid-cols-[1fr_320px]">
         <div className="space-y-8">
+          {showOnboarding && (
+            <section className="flex items-start justify-between gap-4 rounded border border-accent/40 bg-accent/5 p-4">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-accent">Empezá por acá</h2>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Todavía no importaste la estructura académica institucional (preguntas, materias, temas).
+                  Andá a <Link to="/configuracion" className="text-accent underline">Configuración</Link> y usá
+                  "Importar estructura institucional" para empezar.
+                </p>
+              </div>
+              <button
+                onClick={handleDismissOnboarding}
+                aria-label="Descartar aviso de bienvenida"
+                className="shrink-0 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent"
+              >
+                Descartar
+              </button>
+            </section>
+          )}
           {overdue.length > 0 && (
             <TaskGroup title="Vencidas" tasks={overdue} onComplete={handleComplete} tone="danger" />
           )}

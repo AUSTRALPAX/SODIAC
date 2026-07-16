@@ -13,6 +13,7 @@ Documentación completa en [`docs/`](docs/):
 - [ROADMAP.md](docs/ROADMAP.md) — fases de desarrollo.
 - [DECISIONS.md](docs/DECISIONS.md) — decisiones de arquitectura y por qué.
 - [TRACEABILITY_MATRIX.md](docs/TRACEABILITY_MATRIX.md) — requisito → función → entidad → prueba.
+- [MANUAL_DE_USO.md](docs/MANUAL_DE_USO.md) — guía de uso de la aplicación.
 
 ## Requisitos
 
@@ -41,7 +42,15 @@ npm run test
 cd src-tauri && cargo check
 ```
 
+## Instalador de producción
+
+```bash
+npm run tauri build
+```
+
+Genera el instalador de Windows en `src-tauri/target/release/bundle/`. Ver
+`docs/MANUAL_DE_USO.md` para el detalle de instalación y primer uso.
+
 ## Estado
 
-Fase 0 (documentación) y Fase 1 (fundación técnica) en curso. Ver `docs/ROADMAP.md` y
-`CHANGELOG.md`.
+Fases 0 a 10 completas (ver `docs/ROADMAP.md` y `CHANGELOG.md`).

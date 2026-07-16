@@ -26,10 +26,14 @@ export function CommandPalette() {
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-32"
       onClick={() => setOpen(false)}
+      role="presentation"
     >
       <Command
         className="w-full max-w-lg overflow-hidden rounded-lg border border-border bg-surface-elevated shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Paleta de comandos"
       >
         <Command.Input
           autoFocus
