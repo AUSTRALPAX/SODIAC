@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { TrajectoryPage } from "@/features/trajectory/TrajectoryPage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";
 import { SessionsPage } from "@/features/sessions/SessionsPage";
 import { StartSessionPage } from "@/features/sessions/StartSessionPage";
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
       { path: "today", element: <Navigate to="/dashboard" replace /> },
+      { path: "trajectory", element: <TrajectoryPage /> },
       { path: "mapa", element: <CurriculumPage /> },
       { path: "sesiones", element: <SessionsPage /> },
       { path: "sesiones/nueva", element: <StartSessionPage /> },

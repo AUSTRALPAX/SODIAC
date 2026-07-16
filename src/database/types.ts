@@ -37,6 +37,12 @@ export interface SubjectRow extends BaseRow {
   fundamental_question_id: string;
   title: string;
   description: string | null;
+  credits: number;
+  complexity: number;
+  importance: number;
+  estimated_load: number;
+  is_mandatory: number;
+  budgeted_xp: number | null;
 }
 
 export interface TopicRow extends BaseRow {
@@ -372,4 +378,259 @@ export interface ActivityLogRow {
   payload_json: string | null;
   actor: "usuario" | "sistema";
   created_at: string;
+}
+
+// --- Sistema académico de calificaciones, XP, niveles y rangos --------------------------
+
+export interface GradingRubricRow {
+  id: string;
+  title: string;
+  work_type: string;
+  description: string | null;
+  current_version_id: string | null;
+  status: "activa" | "archivada";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GradingRubricVersionRow {
+  id: string;
+  rubric_id: string;
+  version_label: string;
+  total_points: number;
+  changelog: string | null;
+  status: "activa" | "reemplazada" | "archivada";
+  replaces_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RubricCriterionRow {
+  id: string;
+  rubric_version_id: string;
+  code: string;
+  title: string;
+  description: string | null;
+  weight_points: number;
+  sort_order: number;
+}
+
+export type AssignmentStatus =
+  | "borrador"
+  | "listo_para_evaluar"
+  | "evaluacion_pendiente"
+  | "evaluado"
+  | "aceptado"
+  | "revision_solicitada"
+  | "reevaluado"
+  | "reemplazado"
+  | "archivado";
+
+export interface AcademicAssignmentRow extends BaseRow {
+  title: string;
+  work_type: string;
+  subject_id: string | null;
+  topic_id: string | null;
+  competency_id: string | null;
+  fundamental_question_id: string | null;
+  prompt: string | null;
+  rubric_version_id: string | null;
+  status: AssignmentStatus;
+}
+
+export interface AssignmentSubmissionRow {
+  id: string;
+  assignment_id: string;
+  version: number;
+  content: string | null;
+  file_path: string | null;
+  obsidian_note_id: string | null;
+  work_hash: string | null;
+  submitted_at: string;
+  status: "entregado" | "reemplazado";
+  updated_at: string;
+}
+
+export type EvaluationVerdict = "revision_required" | "basic" | "competent" | "advanced" | "outstanding";
+
+export interface AcademicEvaluationRow {
+  id: string;
+  submission_id: string;
+  rubric_version_id: string;
+  total_score: number;
+  score_10: number;
+  verdict: EvaluationVerdict;
+  confidence: number | null;
+  evaluator_notes: string | null;
+  evaluator: "chatgpt" | "fundador" | "sodiac_heuristica";
+  prompt_used: string | null;
+  work_hash: string | null;
+  strengths_json: string | null;
+  critical_errors_json: string | null;
+  required_revisions_json: string | null;
+  is_calibration: number;
+  calibration_of_id: string | null;
+  status: "pendiente" | "aceptada" | "revision_requerida" | "rechazada" | "reemplazada";
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CriterionEvaluationRow {
+  id: string;
+  evaluation_id: string;
+  criterion_id: string;
+  score: number;
+  maximum: number;
+  justification: string | null;
+  evidence_json: string | null;
+  weaknesses_json: string | null;
+  required_improvements_json: string | null;
+}
+
+export type SubjectPlanStatus =
+  | "no_iniciada"
+  | "exploracion"
+  | "cursando"
+  | "evaluacion"
+  | "revision"
+  | "completada"
+  | "completada_con_revision_pendiente"
+  | "reabierta";
+
+export interface SubjectAssessmentPlanRow {
+  id: string;
+  subject_id: string;
+  minimum_final_score: number;
+  minimum_mastery_level: number;
+  requires_applied_evidence: number;
+  requires_integrative_evaluation: number;
+  requires_deferred_review: number;
+  status: SubjectPlanStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AssessmentComponentCategory =
+  | "notas_conceptuales"
+  | "ejercicios_practicas"
+  | "trabajos_aplicados"
+  | "proyecto_examen_integrador"
+  | "revision_diferida_defensa";
+
+export interface AssessmentComponentRow {
+  id: string;
+  plan_id: string;
+  category: AssessmentComponentCategory;
+  weight_pct: number;
+  sort_order: number;
+}
+
+export interface AcademicTranscriptEntryRow {
+  id: string;
+  subject_id: string | null;
+  assignment_id: string | null;
+  evaluation_id: string | null;
+  title: string;
+  work_type: string;
+  score_100: number;
+  score_10: number;
+  verdict: string;
+  status: "vigente" | "reemplazada" | "archivada";
+  recorded_at: string;
+  updated_at: string;
+}
+
+export type XpCategory =
+  | "notas_conceptuales"
+  | "ejercicios_practicas"
+  | "aplicaciones_casos"
+  | "proyecto_examen_integrador"
+  | "hitos_dominio"
+  | "revision_diferida_retencion"
+  | "intento";
+
+export interface XpEventRow {
+  id: string;
+  date: string;
+  amount: number;
+  source_type: string;
+  source_id: string;
+  subject_id: string | null;
+  category: XpCategory;
+  reason: string;
+  score: number | null;
+  multiplier: number | null;
+  rubric_version_id: string | null;
+  idempotency_key: string;
+  reversal_of: string | null;
+  created_at: string;
+  metadata_json: string | null;
+}
+
+export interface AcademicLevelHistoryRow {
+  id: string;
+  level: number;
+  xp_total_at: number;
+  reached_at: string;
+}
+
+export interface AcademicRankRow {
+  id: string;
+  name: string;
+  subtitle: string | null;
+  description: string | null;
+  minimum_level: number;
+  maximum_level: number;
+  sort_order: number;
+  badge: string | null;
+  color_token: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProgressFormulaVersionRow {
+  id: string;
+  version_label: string;
+  weights_json: string;
+  is_current: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CareerProgressSnapshotRow {
+  id: string;
+  formula_version_id: string;
+  ipa_total: number;
+  coverage: number;
+  mastery: number;
+  evidence: number;
+  retention: number;
+  projects: number;
+  computed_at: string;
+}
+
+export interface SubjectProgressSnapshotRow {
+  id: string;
+  subject_id: string;
+  formula_version_id: string;
+  ipa_total: number;
+  coverage: number;
+  mastery: number;
+  evidence: number;
+  retention: number;
+  projects: number;
+  computed_at: string;
+}
+
+export interface EvaluationImportRow {
+  id: string;
+  assignment_id: string | null;
+  submission_id: string | null;
+  raw_response_json: string;
+  validation_status: "pendiente" | "valida" | "rechazada";
+  validation_errors_json: string | null;
+  resulting_evaluation_id: string | null;
+  imported_at: string;
 }

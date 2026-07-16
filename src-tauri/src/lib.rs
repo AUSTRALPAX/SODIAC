@@ -28,6 +28,24 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/0004_obsidian_sync_state.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "academic_progression",
+            sql: include_str!("../../migrations/0005_academic_progression.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 6,
+            description: "academic_assignment_base_columns",
+            sql: include_str!("../../migrations/0006_academic_assignment_base_columns.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 7,
+            description: "academic_updated_at_columns",
+            sql: include_str!("../../migrations/0007_academic_updated_at_columns.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

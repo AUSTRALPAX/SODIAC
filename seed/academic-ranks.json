@@ -1,0 +1,17 @@
+[
+  { "name": "Aspirante", "subtitle": "Lector de la realidad", "minimumLevel": 0, "maximumLevel": 6 },
+  { "name": "Henry Hazlitt", "subtitle": "Intérprete de consecuencias", "minimumLevel": 7, "maximumLevel": 13 },
+  { "name": "Federico Sturzenegger", "subtitle": "Reformador institucional", "minimumLevel": 14, "maximumLevel": 20 },
+  { "name": "Javier Milei", "subtitle": "Paladín de la libertad de occidente", "minimumLevel": 21, "maximumLevel": 27 },
+  { "name": "Richard Cantillon", "subtitle": "Explorador del emprendimiento", "minimumLevel": 28, "maximumLevel": 34 },
+  { "name": "Carl Menger", "subtitle": "Descubridor del valor", "minimumLevel": 35, "maximumLevel": 41 },
+  { "name": "Eugen von Böhm-Bawerk", "subtitle": "Arquitecto del capital y el tiempo", "minimumLevel": 42, "maximumLevel": 48 },
+  { "name": "Israel Kirzner", "subtitle": "Observador del descubrimiento empresarial", "minimumLevel": 49, "maximumLevel": 55 },
+  { "name": "Milton Friedman", "subtitle": "Analista del orden monetario", "minimumLevel": 56, "maximumLevel": 62 },
+  { "name": "John Stuart Mill", "subtitle": "Filósofo de la libertad", "minimumLevel": 63, "maximumLevel": 69 },
+  { "name": "Ludwig von Mises", "subtitle": "Teórico de la acción humana", "minimumLevel": 70, "maximumLevel": 76 },
+  { "name": "Friedrich Hayek", "subtitle": "Cartógrafo del orden espontáneo", "minimumLevel": 77, "maximumLevel": 83 },
+  { "name": "Murray Rothbard", "subtitle": "Constructor del sistema libertario", "minimumLevel": 84, "maximumLevel": 90 },
+  { "name": "Frédéric Bastiat", "subtitle": "Maestro de lo visible y lo invisible", "minimumLevel": 91, "maximumLevel": 99 },
+  { "name": "Adam Smith", "subtitle": "Maestro Mayor, Constructor de la Economía", "minimumLevel": 100, "maximumLevel": 100 }
+]

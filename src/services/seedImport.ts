@@ -174,6 +174,12 @@ export async function importInstitutionalSeed(): Promise<SeedImportSummary> {
         created_at: now(),
         updated_at: now(),
         archived_at: null,
+        credits: 3,
+        complexity: 3,
+        importance: 3,
+        estimated_load: 3,
+        is_mandatory: 1,
+        budgeted_xp: null,
       }),
     );
     subjectIdByCode.set(s.code, id);

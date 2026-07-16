@@ -178,8 +178,9 @@ export function DashboardPage() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <header
-        className="relative overflow-hidden border-b border-border-subtle px-10 py-10"
+        className="relative isolate shrink-0 overflow-hidden border-b border-border-subtle px-10 py-[30px]"
         style={{
+          minHeight: "170px",
           background:
             "radial-gradient(1200px 400px at 20% -20%, var(--atmosphere-blue), transparent), radial-gradient(900px 400px at 90% 10%, var(--atmosphere-purple), transparent), var(--background-deep)",
         }}
@@ -188,34 +189,41 @@ export function DashboardPage() {
           variant="symbol"
           size={64}
           decorative
-          className="pointer-events-none absolute right-10 top-10 text-text-primary opacity-[0.08]"
+          className="pointer-events-none absolute right-10 top-10 z-0 text-text-primary opacity-[0.08]"
         />
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-text-muted">
-          <SodiacLogo variant="symbol" size={16} decorative />
-          SODIAC
-        </div>
-        <h1 className="mt-2 font-display text-3xl font-semibold text-text-primary">
-          {overview?.instituteName}
-        </h1>
-        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-secondary">
-          <span>
-            Etapa actual: <strong className="text-text-primary">{overview?.currentStageTitle ?? "sin datos"}</strong>
-          </span>
-          <span>{new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}</span>
-          <span>
-            Dominio agregado:{" "}
-            <strong className="text-accent">
-              {overview?.avgMasteryLevel != null ? overview.avgMasteryLevel.toFixed(1) : "—"} / 5
-            </strong>
-          </span>
-          <span className="text-text-muted">
-            Cobertura: {overview ? Math.round(overview.coverage * 100) : 0}% ({overview?.evaluatedTopics}/
-            {overview?.totalTopics} temas)
-          </span>
+        <div className="relative z-10 max-w-3xl">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-text-muted">
+            <SodiacLogo variant="symbol" size={14} decorative />
+            SODIAC · TRAYECTORIA ACADÉMICA
+          </div>
+          <h1
+            className="mt-2 font-display font-semibold text-text-primary"
+            style={{ fontSize: "clamp(28px, 3vw, 46px)", lineHeight: 1.05 }}
+          >
+            {overview?.instituteName}
+          </h1>
+          <p className="mt-2 text-sm text-text-secondary">
+            Carrera personal de aprendizaje, aplicación y producción de conocimiento.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-secondary">
+            <span>
+              Etapa actual: <strong className="text-text-primary">{overview?.currentStageTitle ?? "sin datos"}</strong>
+            </span>
+            <span>
+              Dominio agregado:{" "}
+              <strong className="text-accent">
+                {overview?.avgMasteryLevel != null ? overview.avgMasteryLevel.toFixed(1) : "—"} / 5
+              </strong>
+            </span>
+            <span className="text-text-muted">
+              Cobertura: {overview ? Math.round(overview.coverage * 100) : 0}% ({overview?.evaluatedTopics}/
+              {overview?.totalTopics} temas)
+            </span>
+          </div>
         </div>
       </header>
 
-      <div className="flex items-center justify-between gap-4 border-b border-border-subtle px-10 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-subtle px-10 py-3">
         <div className="flex gap-2 text-xs">
           {([30, 90, 365] as const).map((r) => (
             <button
