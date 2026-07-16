@@ -1,6 +1,6 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
-import { TodayPage } from "@/features/today/TodayPage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";
 import { SessionsPage } from "@/features/sessions/SessionsPage";
 import { StartSessionPage } from "@/features/sessions/StartSessionPage";
@@ -19,7 +19,9 @@ export const router = createBrowserRouter([
     path: "/",
     element: <AppShell />,
     children: [
-      { index: true, element: <TodayPage /> },
+      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { path: "dashboard", element: <DashboardPage /> },
+      { path: "today", element: <Navigate to="/dashboard" replace /> },
       { path: "mapa", element: <CurriculumPage /> },
       { path: "sesiones", element: <SessionsPage /> },
       { path: "sesiones/nueva", element: <StartSessionPage /> },

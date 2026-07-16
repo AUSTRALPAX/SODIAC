@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { exists, readTextFile } from "@tauri-apps/plugin-fs";
+import { PdfViewer } from "@/components/documents/PdfViewer";
 import type { DocumentVersionRow, InstitutionalDocumentRow } from "@/database/types";
 import {
+  attachFileToCurrentVersion,
   compareVersions,
+  configureCompendioMaestro,
   listDocuments,
   listVersions,
   publishNewVersion,
+  resolveDocumentFile,
   setDocumentStatus,
   type DocumentWithVersion,
   type MetadataDiffRow,
+  type ResolvedDocumentFile,
 } from "@/services/documents";
+
+const COMPENDIO_CODE = "IAC-CVPS-CM-001";
 
 const STATUS_LABEL: Record<InstitutionalDocumentRow["status"], string> = {
   borrador: "Borrador",
@@ -193,6 +202,8 @@ function DocumentDetail({
         </select>
       </div>
 
+      <DocumentViewerSection document={document} onChanged={onPublished} />
+
       <div className="mt-6">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
@@ -319,6 +330,140 @@ function DocumentDetail({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function DocumentViewerSection({
+  document,
+  onChanged,
+}: {
+  document: DocumentWithVersion;
+  onChanged: () => void;
+}) {
+  const [resolved, setResolved] = useState<ResolvedDocumentFile | null | undefined>(undefined);
+  const [fileMissing, setFileMissing] = useState(false);
+  const [markdownContent, setMarkdownContent] = useState<string | null>(null);
+  const [attaching, setAttaching] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [restrictToFull, setRestrictToFull] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setResolved(undefined);
+    setMarkdownContent(null);
+    setFileMissing(false);
+    if (!document.currentVersion) {
+      setResolved(null);
+      return;
+    }
+    const result = await resolveDocumentFile(document.currentVersion);
+    if (!result) {
+      setResolved(null);
+      return;
+    }
+    const fileExists = await exists(result.filePath);
+    if (!fileExists) {
+      setFileMissing(true);
+      setResolved(result);
+      return;
+    }
+    setResolved(result);
+    if (result.filePath.toLowerCase().endsWith(".md")) {
+      setMarkdownContent(await readTextFile(result.filePath));
+    }
+  }, [document]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function handleAttachFile() {
+    setAttachError(null);
+    const picked = await openDialog({
+      multiple: false,
+      filters: [{ name: "Documentos", extensions: ["pdf", "md"] }],
+    });
+    if (!picked || Array.isArray(picked)) return;
+    setAttaching(true);
+    try {
+      await attachFileToCurrentVersion(document.id, picked);
+      await refresh();
+      onChanged();
+    } catch (e) {
+      setAttachError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAttaching(false);
+    }
+  }
+
+  async function handleConfigureCompendio() {
+    setAttachError(null);
+    const picked = await openDialog({ multiple: false, filters: [{ name: "PDF", extensions: ["pdf"] }] });
+    if (!picked || Array.isArray(picked)) return;
+    setAttaching(true);
+    try {
+      await configureCompendioMaestro(picked);
+      await refresh();
+      onChanged();
+    } catch (e) {
+      setAttachError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAttaching(false);
+    }
+  }
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Visor</h3>
+        <div className="flex gap-2">
+          {document.code === COMPENDIO_CODE && (
+            <button
+              onClick={handleConfigureCompendio}
+              disabled={attaching}
+              className="rounded border border-accent px-2 py-1 text-xs uppercase tracking-wide text-accent disabled:opacity-40"
+            >
+              Configurar Compendio Maestro
+            </button>
+          )}
+          <button
+            onClick={handleAttachFile}
+            disabled={attaching}
+            className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+          >
+            {fileMissing ? "Relocalizar archivo" : "Asociar archivo"}
+          </button>
+        </div>
+      </div>
+
+      {attachError && <p className="mt-2 text-xs text-danger">{attachError}</p>}
+
+      <div className="mt-2">
+        {resolved === undefined ? (
+          <p className="text-sm text-text-muted">Cargando…</p>
+        ) : resolved === null ? (
+          <p className="text-sm text-text-muted">
+            Este documento institucional todavía no tiene un archivo asociado.
+          </p>
+        ) : fileMissing ? (
+          <div className="rounded border border-warning/40 bg-warning/5 p-3 text-xs text-warning">
+            <p>Archivo no encontrado en: {resolved.filePath}</p>
+            <p className="mt-1 text-text-muted">Puede haberse movido o renombrado. Relocalizalo con el botón de arriba.</p>
+          </div>
+        ) : markdownContent !== null ? (
+          <pre className="max-h-[32rem] overflow-auto rounded border border-border-subtle bg-background p-3 text-xs text-text-primary">
+            {markdownContent}
+          </pre>
+        ) : (
+          <PdfViewer
+            documentKey={document.id}
+            filePath={resolved.filePath}
+            rangeStart={restrictToFull ? undefined : resolved.startPage}
+            rangeEnd={restrictToFull ? undefined : resolved.endPage}
+            {...(resolved.endPage ? { onOpenFullDocument: () => setRestrictToFull(true) } : {})}
+          />
+        )}
+      </div>
     </div>
   );
 }

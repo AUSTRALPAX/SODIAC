@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   competenciesRepo,
   fundamentalQuestionsRepo,
   subjectsRepo,
+  tasksRepo,
   topicsRepo,
 } from "@/database/entities";
 import type {
@@ -14,7 +15,7 @@ import type {
   SubjectRow,
   TopicRow,
 } from "@/database/types";
-import { generateChatGptPrompt, startSession, type StartSessionInput } from "@/services/sessions";
+import { generateChatGptPrompt, scheduleSession, startSession, type StartSessionInput } from "@/services/sessions";
 import { createTask } from "@/services/tasks";
 import { getVaultPath, openVaultInObsidian } from "@/services/obsidian";
 
@@ -34,6 +35,8 @@ const CHATGPT_URL = "https://chat.openai.com";
 
 export function StartSessionPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const taskId = searchParams.get("taskId");
 
   const [questions, setQuestions] = useState<FundamentalQuestionRow[]>([]);
   const [competencies, setCompetencies] = useState<CompetencyRow[]>([]);
@@ -55,6 +58,9 @@ export function StartSessionPage() {
   const [starting, setStarting] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
   const [vaultConfigured, setVaultConfigured] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [scheduling, setScheduling] = useState(false);
+  const [obsidianError, setObsidianError] = useState<string | null>(null);
 
   useEffect(() => {
     void Promise.all([
@@ -69,7 +75,19 @@ export function StartSessionPage() {
       setSubjects(s);
       setTopics(t);
       setVaultConfigured(vault !== null);
+
+      const paramQuestion = searchParams.get("fundamentalQuestionId");
+      const paramCompetency = searchParams.get("competencyId");
+      const paramSubject = searchParams.get("subjectId");
+      const paramTopic = searchParams.get("topicId");
+      const paramObjective = searchParams.get("objective");
+      if (paramQuestion) setFundamentalQuestionId(paramQuestion);
+      if (paramCompetency) setCompetencyId(paramCompetency);
+      if (paramSubject) setSubjectId(paramSubject);
+      if (paramTopic) setTopicId(paramTopic);
+      if (paramObjective) setObjective(paramObjective);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredCompetencies = useMemo(
@@ -123,9 +141,22 @@ export function StartSessionPage() {
     setStarting(true);
     try {
       const session = await startSession(currentInput());
+      if (taskId) await tasksRepo.update(taskId, { study_session_id: session.id });
       navigate(`/sesiones/${session.id}`);
     } finally {
       setStarting(false);
+    }
+  }
+
+  async function handleSchedule() {
+    if (!objective.trim() || !scheduleAt) return;
+    setScheduling(true);
+    try {
+      const session = await scheduleSession(currentInput(), new Date(scheduleAt).toISOString());
+      if (taskId) await tasksRepo.update(taskId, { study_session_id: session.id });
+      navigate("/sesiones");
+    } finally {
+      setScheduling(false);
     }
   }
 
@@ -264,13 +295,29 @@ export function StartSessionPage() {
           />
         </Field>
 
-        <div className="flex flex-wrap gap-2 pt-2">
+        <div className="flex flex-wrap items-end gap-2 pt-2">
           <button
             type="submit"
             disabled={starting || !objective.trim()}
             className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent disabled:opacity-40"
           >
             {starting ? "Iniciando…" : "Comenzar sesión"}
+          </button>
+          <Field label="Programar para">
+            <input
+              type="datetime-local"
+              value={scheduleAt}
+              onChange={(e) => setScheduleAt(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <button
+            type="button"
+            onClick={handleSchedule}
+            disabled={scheduling || !objective.trim() || !scheduleAt}
+            className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+          >
+            {scheduling ? "Programando…" : "Programar sesión"}
           </button>
           <button
             type="button"
@@ -290,7 +337,11 @@ export function StartSessionPage() {
             type="button"
             disabled={!vaultConfigured}
             title={vaultConfigured ? undefined : "Configurá el vault en Obsidian primero"}
-            onClick={() => openVaultInObsidian()}
+            onClick={async () => {
+              setObsidianError(null);
+              const result = await openVaultInObsidian();
+              if (!result.success) setObsidianError(result.error ?? "No se pudo abrir Obsidian.");
+            }}
             className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:text-text-muted disabled:opacity-50"
           >
             Abrir vault en Obsidian
@@ -305,6 +356,11 @@ export function StartSessionPage() {
           </button>
         </div>
         {copyMessage && <p className="text-xs text-success">{copyMessage}</p>}
+        {obsidianError && (
+          <p className="text-xs text-danger">
+            No se pudo abrir Obsidian: {obsidianError}. Verificá la integración en Configuración → Obsidian.
+          </p>
+        )}
       </form>
     </div>
   );

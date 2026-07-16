@@ -70,6 +70,7 @@ export function ActiveSessionPage() {
   const [lastComprobacion, setLastComprobacion] = useState<string | null>(null);
 
   const [showFinalize, setShowFinalize] = useState(false);
+  const [obsidianError, setObsidianError] = useState<string | null>(null);
   const [conclusion, setConclusion] = useState("");
   const [evidenceSummary, setEvidenceSummary] = useState("");
   const [nextAction, setNextAction] = useState("");
@@ -299,7 +300,11 @@ export function ActiveSessionPage() {
         <button
           disabled={!vaultConfigured}
           title={vaultConfigured ? undefined : "Configurá el vault en Obsidian primero"}
-          onClick={() => openVaultInObsidian()}
+          onClick={async () => {
+            setObsidianError(null);
+            const result = await openVaultInObsidian();
+            if (!result.success) setObsidianError(result.error ?? "No se pudo abrir Obsidian.");
+          }}
           className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:text-text-muted disabled:opacity-50"
         >
           Abrir Obsidian
@@ -314,6 +319,11 @@ export function ActiveSessionPage() {
           Cancelar sesión
         </button>
       </div>
+      {obsidianError && (
+        <p className="text-xs text-danger">
+          No se pudo abrir Obsidian: {obsidianError}. Verificá la integración en Configuración → Obsidian.
+        </p>
+      )}
       {lastComprobacion && (
         <p className="text-xs text-success">Última comprobación registrada. Se usó como base de la evidencia de cierre.</p>
       )}

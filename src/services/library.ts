@@ -11,6 +11,7 @@ export interface NewResourceInput {
   reading_state?: ResourceRow["reading_state"];
   priority?: string | null;
   url?: string | null;
+  area?: string | null;
 }
 
 export async function createResource(input: NewResourceInput): Promise<ResourceRow> {
@@ -24,6 +25,8 @@ export async function createResource(input: NewResourceInput): Promise<ResourceR
     priority: input.priority ?? null,
     file_path: null,
     url: input.url ?? null,
+    area: input.area ?? null,
+    evaluation_state: null,
     status: "activo",
     sort_order: 0,
     notes: null,

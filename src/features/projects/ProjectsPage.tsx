@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { projectMilestonesRepo } from "@/database/entities";
 import type { ProjectMilestoneRow, ProjectRow } from "@/database/types";
 import {
@@ -255,12 +256,24 @@ function ProjectDetail({
             {CONTEXT_TYPES.find((c) => c.value === project.context_type)?.label}
           </p>
         </div>
-        <button
-          onClick={onToggleClose}
-          className="shrink-0 rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
-        >
-          {project.closed_at ? "Reabrir" : "Cerrar proyecto"}
-        </button>
+        <div className="flex shrink-0 gap-2">
+          {!project.closed_at && (
+            <Link
+              to={`/sesiones/nueva?${new URLSearchParams({
+                objective: `Trabajar en proyecto: ${project.title}`,
+              }).toString()}`}
+              className="rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent"
+            >
+              Iniciar sesión
+            </Link>
+          )}
+          <button
+            onClick={onToggleClose}
+            className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
+          >
+            {project.closed_at ? "Reabrir" : "Cerrar proyecto"}
+          </button>
+        </div>
       </div>
 
       <div className="mt-6">

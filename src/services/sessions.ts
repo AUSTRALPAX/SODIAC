@@ -7,6 +7,7 @@ import {
   reviewsRepo,
   studySessionsRepo,
   subjectsRepo,
+  tasksRepo,
   topicsRepo,
 } from "@/database/entities";
 import type {
@@ -71,7 +72,7 @@ export async function startSession(input: StartSessionInput): Promise<StudySessi
 /** Para recuperar una sesión interrumpida por cierre inesperado (prompt maestro §9). */
 export async function getInProgressSession(): Promise<StudySessionRow | null> {
   const rows = await studySessionsRepo.list({
-    where: "closure_status = 'en_curso'",
+    where: "closure_status = 'en_curso' AND status = 'activa'",
     orderBy: "started_at DESC",
   });
   return rows[0] ?? null;
@@ -87,6 +88,87 @@ export async function cancelSession(id: string, reason?: string): Promise<void> 
     ended_at: now(),
     conclusion: reason ?? "Sesión cancelada por el usuario.",
   });
+}
+
+export async function markSessionIncomplete(id: string, reason: string): Promise<void> {
+  await studySessionsRepo.update(id, {
+    closure_status: "incompleta",
+    ended_at: now(),
+    conclusion: reason,
+  });
+}
+
+/**
+ * Programar una sesión para más adelante sin comenzarla todavía. Usa la
+ * columna `status` (texto libre, sin CHECK) en vez de `closure_status`
+ * (con CHECK fijo a en_curso/formal/cancelada/incompleta) para no requerir
+ * una migración — ver docs/UPDATE_1_1_BASELINE.md.
+ */
+export async function scheduleSession(
+  input: StartSessionInput,
+  scheduledAt: string,
+): Promise<StudySessionRow> {
+  const row: StudySessionRow = {
+    id: crypto.randomUUID(),
+    fundamental_question_id: input.fundamental_question_id ?? null,
+    competency_id: input.competency_id ?? null,
+    subject_id: input.subject_id ?? null,
+    topic_id: input.topic_id ?? null,
+    session_type: input.session_type,
+    planned_duration_min: input.planned_duration_min ?? null,
+    actual_duration_min: null,
+    prior_knowledge: input.prior_knowledge ?? null,
+    observable_objective: input.observable_objective,
+    resources: input.resources ?? null,
+    expected_product: input.expected_product ?? null,
+    continuity_point_prev_id: null,
+    started_at: scheduledAt,
+    ended_at: null,
+    closure_status: "en_curso",
+    conclusion: null,
+    evidence_summary: null,
+    next_action: null,
+    continuity_point: null,
+    status: "programada",
+    sort_order: 0,
+    notes: null,
+    tags: null,
+    created_at: now(),
+    updated_at: now(),
+    archived_at: null,
+  };
+  return studySessionsRepo.insert(row);
+}
+
+export async function listScheduledSessions(): Promise<StudySessionRow[]> {
+  return studySessionsRepo.list({
+    where: "status = 'programada' AND archived_at IS NULL",
+    orderBy: "started_at ASC",
+  });
+}
+
+/** Próxima sesión relevante: la que está en curso o, si no hay, la programada más próxima. */
+export async function getNextSession(): Promise<StudySessionRow | null> {
+  const inProgress = await getInProgressSession();
+  if (inProgress) return inProgress;
+  const scheduled = await listScheduledSessions();
+  return scheduled[0] ?? null;
+}
+
+export async function startScheduledSession(id: string): Promise<StudySessionRow> {
+  await studySessionsRepo.update(id, { status: "activa", started_at: now() });
+  const updated = await studySessionsRepo.getById(id);
+  if (!updated) throw new Error("La sesión no existe.");
+  return updated;
+}
+
+export async function reprogramSession(id: string, newScheduledAt: string): Promise<void> {
+  await studySessionsRepo.update(id, { started_at: newScheduledAt });
+}
+
+export async function getRelatedTaskForSession(sessionId: string) {
+  const rows = await tasksRepo.list({ where: "study_session_id = ?", params: [sessionId] });
+  return rows[0] ?? null;
 }
 
 export interface ComprobacionInput {

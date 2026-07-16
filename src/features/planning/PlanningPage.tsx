@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -159,12 +160,22 @@ export function PlanningPage() {
                       {PRIORITY_LABEL[task.priority]}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleToggle(task)}
-                    className="shrink-0 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent"
-                  >
-                    {task.status === "completada" ? "Reabrir" : "Completar"}
-                  </button>
+                  <div className="flex shrink-0 gap-2">
+                    {task.status !== "completada" && (
+                      <Link
+                        to={`/sesiones/nueva?${new URLSearchParams({ taskId: task.id, objective: task.title }).toString()}`}
+                        className="rounded border border-accent px-2 py-1 text-xs text-accent"
+                      >
+                        Iniciar sesión
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => handleToggle(task)}
+                      className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent"
+                    >
+                      {task.status === "completada" ? "Reabrir" : "Completar"}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   completeReview,
   listReviewQueue,
@@ -196,6 +197,16 @@ function ReviewGroup({
               </span>
             </div>
             <div className="mt-2 flex gap-2">
+              <Link
+                to={`/sesiones/nueva?${new URLSearchParams({
+                  ...(r.topic_id ? { topicId: r.topic_id } : {}),
+                  ...(r.competency_id ? { competencyId: r.competency_id } : {}),
+                  objective: `Repasar: ${r.label}`,
+                }).toString()}`}
+                className="rounded border border-accent px-2 py-1 text-xs text-accent"
+              >
+                Iniciar sesión
+              </Link>
               <button onClick={() => onComplete(r.id)} className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-success hover:text-success">
                 Completar
               </button>

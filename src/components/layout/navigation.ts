@@ -20,7 +20,7 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Hoy", path: "/", icon: Home },
+  { label: "Dashboard", path: "/dashboard", icon: Home },
   { label: "Mapa", path: "/mapa", icon: Network },
   { label: "Sesiones", path: "/sesiones", icon: BookOpen },
   { label: "Planificación", path: "/planificacion", icon: Calendar },

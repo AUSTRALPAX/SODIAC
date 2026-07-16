@@ -1,7 +1,7 @@
 {
   "name": "sodiac-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -32,6 +32,7 @@
     "cmdk": "^1.0.4",
     "js-yaml": "^5.2.1",
     "lucide-react": "^0.469.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.2",

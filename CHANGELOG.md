@@ -2,6 +2,43 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.1.0] — Dashboard, Sesiones, Biblioteca, Documentos y Obsidian
+
+- **Dashboard** (antes "Hoy", ahora en `/dashboard` con redirección desde `/` y `/today`):
+  visión general de la carrera — cabecera con etapa/dominio agregado/cobertura, resumen
+  semanal/mensual, calendario de actividad (heatmap 30/90/365 días), progreso por
+  etapa/pregunta/materia, distribución de niveles de dominio, estadísticas temporales
+  (confianza declarada vs. nivel evaluado), estado del sistema y agenda de 7 días.
+  Personalización de widgets (orden/visibilidad/rango) persistida. Ya no contiene
+  INICIAR ESTUDIO ni gestión de tareas.
+- **Sesiones**: absorbe el flujo operativo — próxima sesión con contexto completo,
+  programar/reprogramar/cancelar/marcar incompleta, 8 vistas (próxima, programadas, en
+  curso, completadas, incompletas, canceladas, historial, calendario). Se puede iniciar
+  desde una tarea, un tema, un repaso, un proyecto o libremente.
+- **Ícono**: corregido el margen transparente excesivo y el fondo transparente — nuevo
+  master a 1024px con símbolo ocupando ~87% del área sobre fondo sólido `#090B0D`,
+  regenerado en todos los tamaños (16 a 1024, `.ico`, `.icns`) y en el favicon.
+- **Obsidian**:
+  - "Abrir en Obsidian" corregido — la causa era un scope de permisos de Tauri que solo
+    permitía abrir `http(s)/mailto/tel`, bloqueando `obsidian://` en silencio.
+  - Panel de diagnóstico completo (vault, permisos, notas indexadas, última
+    sincronización) con botones verificar/abrir/reindexar/elegir vault/abrir carpeta.
+  - Sincronización bidireccional: watcher nativo de archivos (Rust, `notify`) con
+    debounce, reindexado automático al detectar cambios externos, estado por nota
+    (sincronizada/conflicto/no encontrada/…), editor interno con detección de conflicto
+    por checksum (nunca sobrescribe un cambio externo sin preguntar).
+- **Biblioteca**: importados los 39 recursos de la Base Bibliográfica Inicial
+  (`IAC_Compendio_Maestro_v1.0.0.pdf`, páginas 76–80), import idempotente por clave
+  área+autor+título normalizada, sin sobrescribir campos ya completados por el usuario.
+  Filtros por área/tipo/función/estado/disponibilidad, búsqueda y ficha completa.
+- **Documentos**: visor interno de PDF 100% offline (PDF.js, worker empaquetado, sin
+  CDN) con zoom, ajuste al ancho, búsqueda de texto, rotación, pantalla completa,
+  recordar última página/zoom. Soporte de "documentos virtuales" — varios documentos
+  institucionales embebidos como rangos de página dentro de un único Compendio Maestro,
+  sin duplicar el archivo físico.
+- Migraciones `0002`–`0004` (aditivas, sin pérdida de datos): campos institucionales de
+  biblioteca, rangos de página para el visor, estado de sincronización de Obsidian.
+
 ## [Unreleased]
 
 ### Fase 0 — Análisis y documentación

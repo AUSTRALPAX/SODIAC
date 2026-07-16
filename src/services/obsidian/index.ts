@@ -9,7 +9,9 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import { basename, join } from "@tauri-apps/api/path";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { load as loadYaml, dump as dumpYaml } from "js-yaml";
 import { getDb } from "@/database/client";
 import { noteLinksRepo, obsidianNotesRepo } from "@/database/entities";
@@ -114,6 +116,93 @@ export interface IndexSummary {
   unchanged: number;
 }
 
+type IndexOutcome = "created" | "updated" | "unchanged";
+
+/** Procesa un único archivo .md: frontmatter, checksum, wikilinks (compartido por indexVault y el watcher). */
+async function indexOneFile(file: MarkdownFile): Promise<IndexOutcome> {
+  const content = await readTextFile(file.absolutePath);
+  const checksum = await sha256Hex(content);
+  const { frontmatter, body } = parseFrontmatter(content);
+
+  const existingRows = await obsidianNotesRepo.list({
+    where: "vault_relative_path = ?",
+    params: [file.relativePath],
+  });
+  const existingRow = existingRows[0];
+
+  if (existingRow && existingRow.checksum === checksum && existingRow.sync_state !== "no_encontrada") {
+    return "unchanged";
+  }
+
+  const now = new Date().toISOString();
+  const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null;
+  const title = extractTitle(frontmatter, file.relativePath);
+  const sodiacId = typeof frontmatter?.sodiac_id === "string" ? frontmatter.sodiac_id : null;
+  const noteType = typeof frontmatter?.tipo === "string" ? frontmatter.tipo : null;
+  const status = typeof frontmatter?.estado === "string" ? frontmatter.estado : null;
+  const masteryLevel = typeof frontmatter?.dominio === "number" ? frontmatter.dominio : null;
+  const lastReview = typeof frontmatter?.ultima_revision === "string" ? frontmatter.ultima_revision : null;
+  const nextReview = typeof frontmatter?.proxima_revision === "string" ? frontmatter.proxima_revision : null;
+
+  let noteId: string;
+  let outcome: IndexOutcome;
+  if (existingRow) {
+    noteId = existingRow.id;
+    await obsidianNotesRepo.update(noteId, {
+      title,
+      frontmatter_json: frontmatterJson,
+      indexed_at: now,
+      checksum,
+      sodiac_id: sodiacId,
+      note_type: noteType,
+      status,
+      mastery_level: masteryLevel,
+      last_review_at: lastReview,
+      next_review_at: nextReview,
+      sync_state: "sincronizada",
+      last_synced_at: now,
+    });
+    outcome = "updated";
+  } else {
+    noteId = crypto.randomUUID();
+    const row: ObsidianNoteRow = {
+      id: noteId,
+      vault_relative_path: file.relativePath,
+      title,
+      frontmatter_json: frontmatterJson,
+      indexed_at: now,
+      checksum,
+      sodiac_id: sodiacId,
+      note_type: noteType,
+      status,
+      mastery_level: masteryLevel,
+      last_review_at: lastReview,
+      next_review_at: nextReview,
+      created_at: now,
+      updated_at: now,
+      sync_state: "sincronizada",
+      last_synced_at: now,
+    };
+    await obsidianNotesRepo.insert(row);
+    outcome = "created";
+  }
+
+  const db = await getDb();
+  await db.execute("DELETE FROM note_link WHERE source_note_id = ?", [noteId]);
+  for (const target of extractWikilinks(body)) {
+    const link: NoteLinkRow = {
+      id: crypto.randomUUID(),
+      source_note_id: noteId,
+      target_note_path: target,
+      link_type: "wikilink",
+      created_at: now,
+    };
+    await noteLinksRepo.insert(link);
+  }
+
+  return outcome;
+}
+
 /** Indexa el vault completo: frontmatter, checksum y wikilinks por nota (prompt maestro §13). */
 export async function indexVault(): Promise<IndexSummary> {
   const vaultPath = await getVaultPath();
@@ -124,84 +213,38 @@ export async function indexVault(): Promise<IndexSummary> {
   const summary: IndexSummary = { total: files.length, created: 0, updated: 0, unchanged: 0 };
 
   for (const file of files) {
-    const content = await readTextFile(file.absolutePath);
-    const checksum = await sha256Hex(content);
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    const existingRows = await obsidianNotesRepo.list({
-      where: "vault_relative_path = ?",
-      params: [file.relativePath],
-    });
-    const existingRow = existingRows[0];
-
-    if (existingRow && existingRow.checksum === checksum) {
-      summary.unchanged++;
-      continue;
-    }
-
-    const now = new Date().toISOString();
-    const frontmatterJson = frontmatter ? JSON.stringify(frontmatter) : null;
-    const title = extractTitle(frontmatter, file.relativePath);
-    const sodiacId = typeof frontmatter?.sodiac_id === "string" ? frontmatter.sodiac_id : null;
-    const noteType = typeof frontmatter?.tipo === "string" ? frontmatter.tipo : null;
-    const status = typeof frontmatter?.estado === "string" ? frontmatter.estado : null;
-    const masteryLevel = typeof frontmatter?.dominio === "number" ? frontmatter.dominio : null;
-    const lastReview = typeof frontmatter?.ultima_revision === "string" ? frontmatter.ultima_revision : null;
-    const nextReview = typeof frontmatter?.proxima_revision === "string" ? frontmatter.proxima_revision : null;
-
-    let noteId: string;
-    if (existingRow) {
-      noteId = existingRow.id;
-      await obsidianNotesRepo.update(noteId, {
-        title,
-        frontmatter_json: frontmatterJson,
-        indexed_at: now,
-        checksum,
-        sodiac_id: sodiacId,
-        note_type: noteType,
-        status,
-        mastery_level: masteryLevel,
-        last_review_at: lastReview,
-        next_review_at: nextReview,
-      });
-      summary.updated++;
-    } else {
-      noteId = crypto.randomUUID();
-      const row: ObsidianNoteRow = {
-        id: noteId,
-        vault_relative_path: file.relativePath,
-        title,
-        frontmatter_json: frontmatterJson,
-        indexed_at: now,
-        checksum,
-        sodiac_id: sodiacId,
-        note_type: noteType,
-        status,
-        mastery_level: masteryLevel,
-        last_review_at: lastReview,
-        next_review_at: nextReview,
-        created_at: now,
-        updated_at: now,
-      };
-      await obsidianNotesRepo.insert(row);
-      summary.created++;
-    }
-
-    const db = await getDb();
-    await db.execute("DELETE FROM note_link WHERE source_note_id = ?", [noteId]);
-    for (const target of extractWikilinks(body)) {
-      const link: NoteLinkRow = {
-        id: crypto.randomUUID(),
-        source_note_id: noteId,
-        target_note_path: target,
-        link_type: "wikilink",
-        created_at: now,
-      };
-      await noteLinksRepo.insert(link);
-    }
+    const outcome = await indexOneFile(file);
+    if (outcome === "created") summary.created++;
+    else if (outcome === "updated") summary.updated++;
+    else summary.unchanged++;
   }
 
   return summary;
+}
+
+/**
+ * Reacciona a un cambio detectado por el watcher nativo (una ruta absoluta
+ * dentro del vault): reindexa ese archivo si sigue existiendo, o marca la
+ * nota como "no_encontrada" sin borrarla si fue eliminado externamente
+ * (docs/UPDATE_1_1_BASELINE.md — no eliminar inmediatamente el historial).
+ */
+export async function syncSingleAbsolutePath(absolutePath: string): Promise<void> {
+  const vaultPath = await getVaultPath();
+  if (!vaultPath) return;
+  const normalizedVault = vaultPath.replace(/\\/g, "/");
+  const normalizedFile = absolutePath.replace(/\\/g, "/");
+  if (!normalizedFile.startsWith(normalizedVault)) return;
+  const relativePath = normalizedFile.slice(normalizedVault.length).replace(/^\/+/, "");
+
+  if (await exists(absolutePath)) {
+    await indexOneFile({ relativePath, absolutePath });
+    return;
+  }
+
+  const existing = await obsidianNotesRepo.list({ where: "vault_relative_path = ?", params: [relativePath] });
+  if (existing[0]) {
+    await obsidianNotesRepo.update(existing[0].id, { sync_state: "no_encontrada" });
+  }
 }
 
 export async function listIndexedNotes(): Promise<ObsidianNoteRow[]> {
@@ -254,19 +297,200 @@ export async function createNoteFromTemplate(
   await rename(tempPath, finalPath);
 }
 
-async function vaultName(): Promise<string> {
+export interface ObsidianOpenResult {
+  success: boolean;
+  uri: string;
+  error?: string;
+}
+
+/**
+ * Nunca falla en silencio (pedido de la actualización v1.1 — sección Obsidian):
+ * siempre devuelve el URI generado y, si falla, el motivo técnico, para que la
+ * UI pueda mostrarlo, ofrecer copiarlo o abrir la carpeta como alternativa.
+ */
+async function openObsidianUri(uri: string): Promise<ObsidianOpenResult> {
+  try {
+    await openUrl(uri);
+    return { success: true, uri };
+  } catch (error) {
+    console.error("No se pudo abrir el URI de Obsidian:", uri, error);
+    return { success: false, uri, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function openNoteInObsidian(relativePath: string): Promise<ObsidianOpenResult> {
+  const vaultPath = await getVaultPath();
+  if (!vaultPath) return { success: false, uri: "", error: "No hay un vault configurado todavía." };
+  const absolutePath = await join(vaultPath, relativePath);
+  // Ruta absoluta primero (más confiable en Windows que vault+file relativo).
+  const uri = `obsidian://open?path=${encodeURIComponent(absolutePath)}&paneType=tab`;
+  return openObsidianUri(uri);
+}
+
+export async function openVaultInObsidian(): Promise<ObsidianOpenResult> {
   const path = await getVaultPath();
-  if (!path) throw new Error("No hay un vault configurado todavía.");
-  return basename(path);
+  if (!path) return { success: false, uri: "", error: "No hay un vault configurado todavía." };
+  const name = await basename(path);
+  return openObsidianUri(`obsidian://open?vault=${encodeURIComponent(name)}`);
 }
 
-export async function openNoteInObsidian(relativePath: string): Promise<void> {
-  const name = await vaultName();
-  const url = `obsidian://open?vault=${encodeURIComponent(name)}&file=${encodeURIComponent(relativePath.replace(/\.md$/i, ""))}`;
-  await openUrl(url);
+/** Alternativa cuando obsidian:// no abre nada: revelar la carpeta en el explorador. */
+export async function openVaultFolder(): Promise<void> {
+  const vaultPath = await getVaultPath();
+  if (!vaultPath) throw new Error("No hay un vault configurado todavía.");
+  await revealItemInDir(vaultPath);
 }
 
-export async function openVaultInObsidian(): Promise<void> {
-  const name = await vaultName();
-  await openUrl(`obsidian://open?vault=${encodeURIComponent(name)}`);
+export interface ObsidianDiagnostics {
+  vaultPath: string | null;
+  vaultExists: boolean;
+  vaultName: string | null;
+  notesIndexed: number;
+  lastIndexedAt: string | null;
+  permissionMode: ObsidianPermissionMode;
+  canRead: boolean;
+  canWrite: boolean;
+}
+
+/** Botón "Verificar integración" en Configuración → Obsidian. */
+export async function verifyObsidianIntegration(): Promise<ObsidianDiagnostics> {
+  const vaultPath = await getVaultPath();
+  const permissionMode = await getPermissionMode();
+  const vaultExists = vaultPath ? await exists(vaultPath) : false;
+  const notes = vaultExists ? await obsidianNotesRepo.list() : [];
+  const lastIndexedAt = notes.reduce<string | null>((latest, n) => {
+    return !latest || n.indexed_at > latest ? n.indexed_at : latest;
+  }, null);
+
+  return {
+    vaultPath,
+    vaultExists,
+    vaultName: vaultPath ? await basename(vaultPath) : null,
+    notesIndexed: notes.length,
+    lastIndexedAt,
+    permissionMode,
+    canRead: vaultExists,
+    canWrite: vaultExists && permissionMode !== "solo_lectura",
+  };
+}
+
+interface VaultChangePayload {
+  paths: string[];
+  kind: string;
+}
+
+/** Arranca el watcher nativo (Rust, crate `notify`) sobre el vault configurado. */
+export async function startVaultWatcher(): Promise<void> {
+  const vaultPath = await getVaultPath();
+  if (!vaultPath) return;
+  await invoke("start_vault_watcher", { path: vaultPath });
+}
+
+export async function stopVaultWatcher(): Promise<void> {
+  await invoke("stop_vault_watcher");
+}
+
+/**
+ * Escucha los cambios detectados por el watcher nativo y reindexa cada
+ * archivo afectado. Devuelve la función de desuscripción.
+ */
+export async function onVaultChanged(onSynced: () => void): Promise<UnlistenFn> {
+  return listen<VaultChangePayload>("obsidian-vault-changed", (event) => {
+    void (async () => {
+      for (const path of event.payload.paths) {
+        await syncSingleAbsolutePath(path);
+      }
+      onSynced();
+    })();
+  });
+}
+
+export interface SyncDiagnostics {
+  total: number;
+  sincronizada: number;
+  pendiente: number;
+  conflicto: number;
+  noEncontrada: number;
+  error: number;
+  soloLectura: number;
+  sinSodiacId: number;
+}
+
+/** Vista de diagnóstico de sincronización (docs/UPDATE_1_1_BASELINE.md). */
+export async function getSyncDiagnostics(): Promise<SyncDiagnostics> {
+  const notes = await obsidianNotesRepo.list();
+  const count = (state: ObsidianNoteRow["sync_state"]) => notes.filter((n) => n.sync_state === state).length;
+  return {
+    total: notes.length,
+    sincronizada: count("sincronizada"),
+    pendiente: count("pendiente"),
+    conflicto: count("conflicto"),
+    noEncontrada: count("no_encontrada"),
+    error: count("error"),
+    soloLectura: count("solo_lectura"),
+    sinSodiacId: notes.filter((n) => !n.sodiac_id).length,
+  };
+}
+
+export class ObsidianConflictError extends Error {
+  constructor(public readonly relativePath: string, public readonly currentDiskContent: string) {
+    super(`El archivo cambió externamente desde la última lectura: ${relativePath}`);
+    this.name = "ObsidianConflictError";
+  }
+}
+
+/**
+ * Escribe el cuerpo editado de una nota desde SODIAC. Antes de sobrescribir,
+ * compara el checksum contra el que quedó registrado en la última indexación;
+ * si no coincide, el archivo cambió externamente mientras estaba abierto en
+ * SODIAC — no sobrescribe, lanza ObsidianConflictError para que la UI
+ * muestre la comparación (docs/UPDATE_1_1_BASELINE.md — conflictos).
+ */
+export async function updateNoteBody(noteId: string, newBody: string): Promise<void> {
+  const mode = await getPermissionMode();
+  if (mode !== "lectura_creacion_actualizacion_metadatos") {
+    throw new Error("El modo de permisos actual no habilita escritura de contenido.");
+  }
+  const note = await obsidianNotesRepo.getById(noteId);
+  if (!note) throw new Error("La nota no existe en el índice.");
+  const vaultPath = await getVaultPath();
+  if (!vaultPath) throw new Error("No hay un vault configurado todavía.");
+
+  const safeRelative = resolveWithinVault(note.vault_relative_path);
+  const finalPath = await join(vaultPath, safeRelative);
+
+  const currentContent = await readTextFile(finalPath);
+  const currentChecksum = await sha256Hex(currentContent);
+  if (note.checksum && currentChecksum !== note.checksum) {
+    throw new ObsidianConflictError(note.vault_relative_path, currentContent);
+  }
+
+  const { frontmatter } = parseFrontmatter(currentContent);
+  const yamlBlock = frontmatter ? dumpYaml(frontmatter, { skipInvalid: true }).trimEnd() : "";
+  const content = yamlBlock ? `---\n${yamlBlock}\n---\n\n${newBody}` : newBody;
+
+  const tempPath = `${finalPath}.sodiac-tmp`;
+  await writeTextFile(tempPath, content);
+  await rename(tempPath, finalPath);
+
+  const newChecksum = await sha256Hex(content);
+  const now = new Date().toISOString();
+  await obsidianNotesRepo.update(noteId, {
+    checksum: newChecksum,
+    indexed_at: now,
+    last_synced_at: now,
+    sync_state: "sincronizada",
+    updated_at: now,
+  });
+}
+
+/** Lee el cuerpo actual (sin frontmatter) de una nota indexada. */
+export async function readNoteBody(noteId: string): Promise<string> {
+  const note = await obsidianNotesRepo.getById(noteId);
+  if (!note) throw new Error("La nota no existe en el índice.");
+  const vaultPath = await getVaultPath();
+  if (!vaultPath) throw new Error("No hay un vault configurado todavía.");
+  const finalPath = await join(vaultPath, resolveWithinVault(note.vault_relative_path));
+  const content = await readTextFile(finalPath);
+  return parseFrontmatter(content).body;
 }

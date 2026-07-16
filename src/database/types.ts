@@ -103,6 +103,9 @@ export interface DocumentVersionRow {
   status: string;
   created_at: string;
   updated_at: string;
+  source_document_id: string | null;
+  start_page: number | null;
+  end_page: number | null;
 }
 
 export type SessionType =
@@ -294,6 +297,8 @@ export interface ResourceRow extends BaseRow {
   priority: string | null;
   file_path: string | null;
   url: string | null;
+  area: string | null;
+  evaluation_state: string | null;
 }
 
 export interface BibliographicSourceRow {
@@ -324,6 +329,8 @@ export interface ObsidianNoteRow {
   next_review_at: string | null;
   created_at: string;
   updated_at: string;
+  sync_state: "sincronizada" | "pendiente" | "conflicto" | "no_encontrada" | "error" | "solo_lectura";
+  last_synced_at: string | null;
 }
 
 export interface NoteLinkRow {

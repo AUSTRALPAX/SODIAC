@@ -1,12 +1,34 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+mod vault_watcher;
+
 fn migrations() -> Vec<Migration> {
-    vec![Migration {
-        version: 1,
-        description: "init_schema",
-        sql: include_str!("../../migrations/0001_init.sql"),
-        kind: MigrationKind::Up,
-    }]
+    vec![
+        Migration {
+            version: 1,
+            description: "init_schema",
+            sql: include_str!("../../migrations/0001_init.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "library_institutional_fields",
+            sql: include_str!("../../migrations/0002_library_institutional_fields.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "document_viewer_ranges",
+            sql: include_str!("../../migrations/0003_document_viewer_ranges.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 4,
+            description: "obsidian_sync_state",
+            sql: include_str!("../../migrations/0004_obsidian_sync_state.sql"),
+            kind: MigrationKind::Up,
+        },
+    ]
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,6 +52,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(vault_watcher::WatcherState::default())
+        .invoke_handler(tauri::generate_handler![
+            vault_watcher::start_vault_watcher,
+            vault_watcher::stop_vault_watcher,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

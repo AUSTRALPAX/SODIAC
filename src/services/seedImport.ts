@@ -298,6 +298,9 @@ export async function importInstitutionalSeed(): Promise<SeedImportSummary> {
           status: d.status ?? "borrador",
           created_at: now(),
           updated_at: now(),
+          source_document_id: null,
+          start_page: null,
+          end_page: null,
         },
         "sistema",
       );
