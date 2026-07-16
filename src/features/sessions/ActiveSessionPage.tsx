@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+  obsidianNotesRepo,
   studyBlocksRepo,
   pomodoroCyclesRepo,
   competenciesRepo,
@@ -9,7 +10,15 @@ import {
   topicsRepo,
   studySessionsRepo,
 } from "@/database/entities";
-import type { CompetencyRow, StudyBlockRow, StudySessionRow, SubjectRow, TaskRow, TopicRow } from "@/database/types";
+import type {
+  CompetencyRow,
+  ObsidianNoteRow,
+  StudyBlockRow,
+  StudySessionRow,
+  SubjectRow,
+  TaskRow,
+  TopicRow,
+} from "@/database/types";
 import {
   cancelSession,
   finalizeSession,
@@ -18,7 +27,7 @@ import {
   saveSessionDraft,
 } from "@/services/sessions";
 import { registerPendingSave } from "@/services/closeGuard";
-import { getVaultPath, openVaultInObsidian } from "@/services/obsidian";
+import { createNoteFromTemplate, getVaultPath, indexVault, openNoteInObsidian, openVaultInObsidian } from "@/services/obsidian";
 import {
   checkSubjectCompletionGate,
   previewSubjectCompletion,
@@ -101,6 +110,13 @@ export function ActiveSessionPage() {
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const [vaultConfigured, setVaultConfigured] = useState(false);
 
+  // Nota de Obsidian vinculada al tema de esta sesión (por sodiac_id) — para
+  // que "Abrir Obsidian" lleve directo a la nota, no solo al vault.
+  const [relatedNote, setRelatedNote] = useState<ObsidianNoteRow | null>(null);
+  const [showMissingNoteInfo, setShowMissingNoteInfo] = useState(false);
+  const [creatingNote, setCreatingNote] = useState(false);
+  const [createNoteError, setCreateNoteError] = useState<string | null>(null);
+
   // Autoguardado del cierre en curso (H3): permite recuperar el texto si la
   // app se cierra antes de confirmar "Finalizar estudio".
   const [draftStatus, setDraftStatus] = useState<"idle" | "guardando" | "guardado" | "error">("idle");
@@ -123,13 +139,14 @@ export function ActiveSessionPage() {
     const row = await studySessionsRepo.getById(id);
     setSession(row);
     if (row) {
-      const [c, t, b, vault, task, subj] = await Promise.all([
+      const [c, t, b, vault, task, subj, notes] = await Promise.all([
         row.competency_id ? competenciesRepo.getById(row.competency_id) : Promise.resolve(null),
         row.topic_id ? topicsRepo.getById(row.topic_id) : Promise.resolve(null),
         studyBlocksRepo.list({ where: "study_session_id = ?", params: [row.id], orderBy: "created_at DESC" }),
         getVaultPath(),
         getRelatedTaskForSession(row.id),
         row.subject_id ? subjectsRepo.getById(row.subject_id) : Promise.resolve(null),
+        row.topic_id ? obsidianNotesRepo.list({ where: "sodiac_id = ?", params: [row.topic_id] }) : Promise.resolve([]),
       ]);
       setCompetency(c);
       setTopic(t);
@@ -137,6 +154,7 @@ export function ActiveSessionPage() {
       setVaultConfigured(vault !== null);
       setRelatedTask(task && !task.completed_at ? task : null);
       setSubject(subj && !subj.completed_at ? subj : null);
+      setRelatedNote(notes[0] ?? null);
 
       const [taskPreview, topicPreview, subjectPreview, gate] = await Promise.all([
         task && !task.completed_at ? previewTaskCompletion(task) : Promise.resolve(null),
@@ -314,6 +332,56 @@ export function ActiveSessionPage() {
     navigate("/sesiones");
   }
 
+  function slugify(text: string): string {
+    return text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
+
+  /**
+   * Crea la nota faltante para el tema de esta sesión, vinculada por
+   * sodiac_id (mismo mecanismo que usan las 495 notas ya reconciliadas
+   * desde el vault) — para los ~43 temas legacy que nunca tuvieron una
+   * nota real. Se guarda directamente en 05_Temas/ (ya existe en todo vault
+   * real, a diferencia de una subcarpeta nueva — crear una carpeta nueva
+   * dentro del vault falla con "os error 2" en esta instalación, así que
+   * evitamos necesitar mkdir) con el prefijo "sodiac-" para no mezclarse
+   * con la numeración canónica MAT-XX/T-XX.YY.
+   */
+  async function handleCreateNoteForTopic() {
+    if (!topic) return;
+    setCreatingNote(true);
+    setCreateNoteError(null);
+    try {
+      const relativePath = `05_Temas/sodiac-${slugify(topic.title)}.md`;
+      await createNoteFromTemplate(
+        relativePath,
+        {
+          sodiac_id: topic.id,
+          tipo: "tema",
+          materia: subject?.title ?? null,
+          tema: topic.title,
+          estado: "activa",
+          dominio: 0,
+          progreso: 0,
+        },
+        `# ${topic.title}\n\n${subject ? `Materia: ${subject.title}\n\n` : ""}Escribí acá el desarrollo de este tema.\n`,
+      );
+      await indexVault(); // el archivo recién creado necesita indexarse para que sodiac_id quede consultable.
+      const notes = await obsidianNotesRepo.list({ where: "sodiac_id = ?", params: [topic.id] });
+      setRelatedNote(notes[0] ?? null);
+      setShowMissingNoteInfo(false);
+      if (notes[0]) await openNoteInObsidian(notes[0].vault_relative_path);
+    } catch (e) {
+      setCreateNoteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCreatingNote(false);
+    }
+  }
+
   if (loading) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
   if (!session) return <div className="p-10 text-sm text-danger">La sesión no existe.</div>;
 
@@ -411,12 +479,18 @@ export function ActiveSessionPage() {
           title={vaultConfigured ? undefined : "Configurá el vault en Obsidian primero"}
           onClick={async () => {
             setObsidianError(null);
-            const result = await openVaultInObsidian();
+            if (topic && !relatedNote) {
+              setShowMissingNoteInfo(true);
+              return;
+            }
+            const result = relatedNote
+              ? await openNoteInObsidian(relatedNote.vault_relative_path)
+              : await openVaultInObsidian();
             if (!result.success) setObsidianError(result.error ?? "No se pudo abrir Obsidian.");
           }}
           className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:text-text-muted disabled:opacity-50"
         >
-          Abrir Obsidian
+          {relatedNote ? "Abrir nota en Obsidian" : "Abrir Obsidian"}
         </button>
         <button onClick={() => setShowComprobar(true)} className="rounded border border-accent px-4 py-2 text-sm uppercase tracking-wide text-accent">
           Comprobar
@@ -441,6 +515,34 @@ export function ActiveSessionPage() {
         <p className="text-xs text-danger">
           No se pudo abrir Obsidian: {obsidianError}. Verificá la integración en Configuración → Obsidian.
         </p>
+      )}
+      {showMissingNoteInfo && topic && (
+        <div className="rounded border border-warning/40 bg-warning/5 p-3 text-xs">
+          <p className="text-warning">
+            El tema "{topic.title}"{subject ? ` (materia: ${subject.title})` : ""} todavía no tiene una nota
+            vinculada en Obsidian.
+          </p>
+          <p className="mt-1 text-text-muted">
+            Para vincularla, la nota necesita <code>sodiac_id: {topic.id}</code> en su frontmatter — o creá una
+            nueva ahora mismo con ese vínculo ya puesto.
+          </p>
+          {createNoteError && <p className="mt-1 text-danger">{createNoteError}</p>}
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => void handleCreateNoteForTopic()}
+              disabled={creatingNote}
+              className="rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent disabled:opacity-40"
+            >
+              {creatingNote ? "Creando…" : "Crear nota ahora"}
+            </button>
+            <button
+              onClick={() => setShowMissingNoteInfo(false)}
+              className="rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:border-accent hover:text-accent"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
       )}
       {lastComprobacion && (
         <p className="text-xs text-success">Última comprobación registrada. Se usó como base de la evidencia de cierre.</p>
