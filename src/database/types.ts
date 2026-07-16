@@ -45,12 +45,39 @@ export interface SubjectRow extends BaseRow {
   budgeted_xp: number | null;
   completed_at: string | null;
   completion_budgeted_xp: number | null;
+  learning_stage_id: string | null;
+  career_id: string | null;
+}
+
+export interface CareerRow extends BaseRow {
+  title: string;
+  version_label: string;
+  source_document_path: string | null;
+  imported_at: string | null;
+  total_xp_budget: number | null;
+}
+
+export interface CurriculumUnitRow extends BaseRow {
+  subject_id: string;
+  title: string;
+  description: string | null;
+  budgeted_xp: number | null;
+}
+
+export interface CurriculumActivityRow extends BaseRow {
+  topic_id: string;
+  title: string;
+  activity_type: string;
+  estimated_minutes: number | null;
+  scheduled_date: string | null;
+  completed_at: string | null;
 }
 
 export interface TopicRow extends BaseRow {
   subject_id: string;
   competency_id: string | null;
   learning_stage_id: string | null;
+  curriculum_unit_id: string | null;
   title: string;
   description: string | null;
   completed_at: string | null;

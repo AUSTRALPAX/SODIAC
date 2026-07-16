@@ -11,10 +11,13 @@ import type {
   BackupRecordRow,
   BibliographicSourceRow,
   CareerProgressSnapshotRow,
+  CareerRow,
   CompetencyRow,
   ContinuityPointRow,
   CriterionEvaluationRow,
+  CurriculumActivityRow,
   CurriculumDependencyRow,
+  CurriculumUnitRow,
   DailyPlanRow,
   DocumentVersionRow,
   EvaluationImportRow,
@@ -53,6 +56,9 @@ export const learningStagesRepo = createRepository<LearningStageRow>("learning_s
 export const subjectsRepo = createRepository<SubjectRow>("subject");
 export const topicsRepo = createRepository<TopicRow>("topic");
 export const curriculumDependenciesRepo = createRepository<CurriculumDependencyRow>("curriculum_dependency");
+export const careersRepo = createRepository<CareerRow>("career");
+export const curriculumUnitsRepo = createRepository<CurriculumUnitRow>("curriculum_unit");
+export const curriculumActivitiesRepo = createRepository<CurriculumActivityRow>("curriculum_activity");
 export const projectsRepo = createRepository<ProjectRow>("project");
 export const projectMilestonesRepo = createRepository<ProjectMilestoneRow>("project_milestone");
 export const institutionalDocumentsRepo = createRepository<InstitutionalDocumentRow>("institutional_document");
