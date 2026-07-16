@@ -14,8 +14,17 @@ export interface FundamentalQuestionRow extends BaseRow {
   code: string;
   title: string;
   description: string | null;
+  /** ID nativo del vault (p. ej. "PF-01"), null/ausente si la fila no viene de Obsidian. */
+  external_ref?: string | null;
 }
 
+/**
+ * `origin` distingue dos conceptos que conviven en esta tabla (Fase I/J,
+ * ver docs/MASTER_SCHEDULE_MAP_AUDIT.md §5): "legacy" son los micro-objetivos
+ * de rúbrica de una fase anterior (códigos A5.1/E2.1/F0.1…, sin ningún uso
+ * real hoy); "curriculum" son las competencias reales del currículo,
+ * importadas desde el vault (COMP-01..10).
+ */
 export interface CompetencyRow extends BaseRow {
   fundamental_question_id: string | null;
   code: string;
@@ -23,6 +32,8 @@ export interface CompetencyRow extends BaseRow {
   description: string | null;
   level_group: number;
   evidence_hint: string | null;
+  origin?: "legacy" | "curriculum";
+  external_ref?: string | null;
 }
 
 export interface LearningStageRow extends BaseRow {
@@ -47,6 +58,8 @@ export interface SubjectRow extends BaseRow {
   completion_budgeted_xp: number | null;
   learning_stage_id: string | null;
   career_id: string | null;
+  /** ID nativo del vault (p. ej. "MAT-01"), null/ausente si la fila no viene de Obsidian. */
+  external_ref?: string | null;
 }
 
 export interface CareerRow extends BaseRow {
@@ -81,6 +94,39 @@ export interface TopicRow extends BaseRow {
   title: string;
   description: string | null;
   completed_at: string | null;
+  /** ID nativo del vault (p. ej. "T-01.01"), null/ausente si la fila no viene de Obsidian. */
+  external_ref?: string | null;
+}
+
+/** Vínculos secundarios (sección 19): la relación jerárquica primaria sigue
+ * siendo subject.fundamental_question_id / topic.competency_id; estas tablas
+ * guardan el resto de preguntas/competencias que una materia o tema declare. */
+export interface SubjectFundamentalQuestionRow {
+  id: string;
+  subject_id: string;
+  fundamental_question_id: string;
+  created_at: string;
+}
+
+export interface SubjectCompetencyRow {
+  id: string;
+  subject_id: string;
+  competency_id: string;
+  created_at: string;
+}
+
+export interface TopicFundamentalQuestionRow {
+  id: string;
+  topic_id: string;
+  fundamental_question_id: string;
+  created_at: string;
+}
+
+export interface TopicCompetencyRow {
+  id: string;
+  topic_id: string;
+  competency_id: string;
+  created_at: string;
 }
 
 export interface CurriculumDependencyRow {

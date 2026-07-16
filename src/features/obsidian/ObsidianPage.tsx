@@ -25,6 +25,19 @@ import {
   type SyncDiagnostics,
 } from "@/services/obsidian";
 import { isSafeModeEnabled } from "@/services/safeMode";
+import {
+  clearBrokenTopicCompetencyRefs,
+  computeAcademicIntegrityAudit,
+  generateSequentialDependencies,
+  importCareerFromObsidian,
+  listReconciliationCandidates,
+  previewReconciliation,
+  type AcademicIntegrityAudit,
+  type ReconciliationCandidate,
+  type ReconciliationPreview,
+  type ReconciliationSummary,
+  type SequentialDependencyResult,
+} from "@/services/curriculumReconciliation";
 import type { ObsidianNoteRow, ObsidianPermissionMode } from "@/database/types";
 
 const SYNC_STATE_LABEL: Record<ObsidianNoteRow["sync_state"], string> = {
@@ -71,6 +84,20 @@ export function ObsidianPage() {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnostics | null>(null);
+  const [reconciliationPreview, setReconciliationPreview] = useState<ReconciliationPreview | null>(null);
+  const [reconciliationSummary, setReconciliationSummary] = useState<ReconciliationSummary | null>(null);
+  const [reconciling, setReconciling] = useState(false);
+  const [previewingReconciliation, setPreviewingReconciliation] = useState(false);
+  const [integrityAudit, setIntegrityAudit] = useState<AcademicIntegrityAudit | null>(null);
+  const [auditingIntegrity, setAuditingIntegrity] = useState(false);
+  const [clearingRefs, setClearingRefs] = useState(false);
+  const [dependencyResult, setDependencyResult] = useState<SequentialDependencyResult | null>(null);
+  const [generatingDependencies, setGeneratingDependencies] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [candidates, setCandidates] = useState<ReconciliationCandidate[] | null>(null);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [selectedRefs, setSelectedRefs] = useState<Set<string>>(new Set());
+  const [importingSelected, setImportingSelected] = useState(false);
   const [editingNote, setEditingNote] = useState<ObsidianNoteRow | null>(null);
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
@@ -141,6 +168,95 @@ export function ObsidianPage() {
       setSyncDiagnostics(await getSyncDiagnostics());
     } finally {
       setVerifying(false);
+    }
+  }
+
+  async function handleAuditIntegrity() {
+    setAuditingIntegrity(true);
+    try {
+      setIntegrityAudit(await computeAcademicIntegrityAudit());
+    } finally {
+      setAuditingIntegrity(false);
+    }
+  }
+
+  async function handleClearBrokenRefs() {
+    if (!integrityAudit) return;
+    const confirmed = window.confirm(
+      `Esto va a limpiar ${integrityAudit.brokenTopicCompetencyRefs} referencia(s) rota(s) tema→competencia (las deja sin competencia asignada, no borra el tema). ¿Continuar?`,
+    );
+    if (!confirmed) return;
+    setClearingRefs(true);
+    try {
+      await clearBrokenTopicCompetencyRefs();
+      setIntegrityAudit(await computeAcademicIntegrityAudit());
+    } finally {
+      setClearingRefs(false);
+    }
+  }
+
+  async function handleGenerateDependencies() {
+    setGeneratingDependencies(true);
+    try {
+      setDependencyResult(await generateSequentialDependencies());
+    } finally {
+      setGeneratingDependencies(false);
+    }
+  }
+
+  async function handleOpenWizard() {
+    setShowWizard((s) => !s);
+    if (showWizard) return; // se está cerrando, no hace falta recargar
+    setLoadingCandidates(true);
+    try {
+      const list = await listReconciliationCandidates();
+      setCandidates(list);
+      setSelectedRefs(new Set(list.filter((c) => c.confidence === "alta").map((c) => c.externalRef)));
+    } finally {
+      setLoadingCandidates(false);
+    }
+  }
+
+  function toggleCandidate(externalRef: string) {
+    setSelectedRefs((prev) => {
+      const next = new Set(prev);
+      if (next.has(externalRef)) next.delete(externalRef);
+      else next.add(externalRef);
+      return next;
+    });
+  }
+
+  async function handleImportSelected() {
+    setImportingSelected(true);
+    try {
+      const result = await importCareerFromObsidian({ onlyExternalRefs: selectedRefs });
+      setReconciliationSummary(result);
+      setReconciliationPreview(await previewReconciliation());
+      setCandidates(await listReconciliationCandidates());
+      setSelectedRefs(new Set());
+    } finally {
+      setImportingSelected(false);
+    }
+  }
+
+  async function handlePreviewReconciliation() {
+    setPreviewingReconciliation(true);
+    setReconciliationSummary(null);
+    try {
+      setReconciliationPreview(await previewReconciliation());
+    } finally {
+      setPreviewingReconciliation(false);
+    }
+  }
+
+  async function handleImportReconciliation() {
+    setReconciling(true);
+    try {
+      const result = await importCareerFromObsidian();
+      setReconciliationSummary(result);
+      setReconciliationPreview(await previewReconciliation());
+    } finally {
+      setReconciling(false);
     }
   }
 
@@ -399,6 +515,267 @@ export function ObsidianPage() {
           </>
         )}
       </section>
+
+      {vaultPath && (
+        <section className="mt-6 rounded border border-border-subtle bg-surface p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            Integridad académica
+          </h2>
+          <p className="mt-1 text-xs text-text-muted">
+            El vault ya tiene el currículo completo (preguntas, competencias, materias y temas con IDs
+            explícitos en el frontmatter) pero Carrera solo tenía una muestra de prueba — ver
+            docs/MASTER_SCHEDULE_MAP_AUDIT.md. Esto agrega lo que falte sin borrar ni modificar nada existente.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={handlePreviewReconciliation}
+              disabled={previewingReconciliation}
+              className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              {previewingReconciliation ? "Revisando…" : "Revisar candidatos"}
+            </button>
+            {reconciliationPreview && !reconciliationPreview.alreadyReconciled && (
+              <button
+                onClick={handleImportReconciliation}
+                disabled={reconciling}
+                className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent disabled:opacity-40"
+              >
+                {reconciling ? "Importando…" : "Importar currículo desde Obsidian"}
+              </button>
+            )}
+            <button
+              onClick={() => void handleOpenWizard()}
+              disabled={loadingCandidates}
+              className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              {loadingCandidates ? "Cargando…" : showWizard ? "Ocultar revisión detallada" : "Revisar candidato por candidato"}
+            </button>
+          </div>
+
+          {showWizard && candidates && (
+            <div className="mt-3 rounded border border-border-subtle bg-background p-3">
+              <p className="text-xs text-text-muted">
+                Cada candidato aparece con su archivo, tipo detectado y relaciones. Los de confianza "alta" vienen
+                pre-tildados; revisá los de confianza "media"/"baja" antes de aprobarlos — no se crea nada hasta
+                que apretás "Importar seleccionados".
+              </p>
+              {candidates.length === 0 ? (
+                <p className="mt-2 text-xs text-success">No hay candidatos nuevos detectados en el vault.</p>
+              ) : (
+                <>
+                  <ul className="mt-2 max-h-80 space-y-1 overflow-y-auto">
+                    {candidates.map((c) => (
+                      <li
+                        key={c.noteId}
+                        className="flex items-start gap-2 rounded border border-border-subtle p-2 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={selectedRefs.has(c.externalRef)}
+                          onChange={() => toggleCandidate(c.externalRef)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded border border-border px-1.5 py-0.5 uppercase tracking-wide text-text-muted">
+                              {c.detectedType}
+                            </span>
+                            <span className="text-text-primary">{c.title}</span>
+                            <span
+                              className={`ml-auto rounded px-1.5 py-0.5 uppercase tracking-wide ${
+                                c.confidence === "alta"
+                                  ? "text-success"
+                                  : c.confidence === "media"
+                                    ? "text-warning"
+                                    : "text-danger"
+                              }`}
+                            >
+                              confianza {c.confidence}
+                            </span>
+                          </p>
+                          <p className="mt-0.5 truncate text-text-muted">{c.vaultRelativePath}</p>
+                          {c.materiaRef && <p className="text-text-muted">Materia: {c.materiaRef}</p>}
+                          {(c.questionRefs.length > 0 || c.competencyRefs.length > 0) && (
+                            <p className="text-text-muted">
+                              Relaciones: {[...c.questionRefs, ...c.competencyRefs].join(", ")}
+                            </p>
+                          )}
+                          {c.reason && <p className="mt-0.5 text-warning">{c.reason}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    onClick={() => void handleImportSelected()}
+                    disabled={importingSelected || selectedRefs.size === 0}
+                    className="mt-3 rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent disabled:opacity-40"
+                  >
+                    {importingSelected ? "Importando…" : `Importar seleccionados (${selectedRefs.size})`}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {reconciliationPreview && (
+            <div className="mt-3 grid grid-cols-2 gap-3 rounded border border-border-subtle bg-background p-3 text-xs sm:grid-cols-4">
+              <DiagnosticItem label="Preguntas por vincular" value={String(reconciliationPreview.questionsToLink)} />
+              <DiagnosticItem label="Competencias por crear" value={String(reconciliationPreview.competenciesToCreate)} />
+              <DiagnosticItem label="Materias por crear" value={String(reconciliationPreview.subjectsToCreate)} />
+              <DiagnosticItem label="Temas por crear" value={String(reconciliationPreview.topicsToCreate)} />
+              {reconciliationPreview.alreadyReconciled && (
+                <p className="col-span-full text-success">Todo lo detectable en el vault ya está reconciliado.</p>
+              )}
+            </div>
+          )}
+
+          {reconciliationSummary && (
+            <div className="mt-3 rounded border border-success/40 bg-success/5 p-3 text-xs text-text-secondary">
+              <p className="font-semibold text-success">Importación completada.</p>
+              <p className="mt-1">
+                {reconciliationSummary.questionsLinked} preguntas vinculadas ·{" "}
+                {reconciliationSummary.competenciesCreated} competencias creadas (
+                {reconciliationSummary.competenciesSkipped} ya existían) · {reconciliationSummary.subjectsCreated}{" "}
+                materias creadas ({reconciliationSummary.subjectsSkipped} ya existían) ·{" "}
+                {reconciliationSummary.topicsCreated} temas creados ({reconciliationSummary.topicsSkipped} ya
+                existían) · {reconciliationSummary.notesLinked} notas de Obsidian vinculadas por sodiac_id.
+              </p>
+              {reconciliationSummary.unresolved.length > 0 && (
+                <div className="mt-2">
+                  <p className="font-semibold text-warning">Sin resolver ({reconciliationSummary.unresolved.length}):</p>
+                  <ul className="mt-1 max-h-32 list-disc space-y-0.5 overflow-y-auto pl-4">
+                    {reconciliationSummary.unresolved.map((u, i) => (
+                      <li key={i}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 border-t border-border-subtle pt-3">
+            <p className="text-xs text-text-muted">
+              Formaliza, dentro de cada materia, que el tema N requiere el tema N-1 (el mismo orden que ya usa el
+              Cronograma Maestro) — antes solo era un cálculo implícito, esto lo vuelve una fila real en
+              curriculum_dependency, que el Cronograma y el panel de "Ver requisitos" pasan a leer.
+            </p>
+            <button
+              onClick={() => void handleGenerateDependencies()}
+              disabled={generatingDependencies}
+              className="mt-2 rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              {generatingDependencies ? "Generando…" : "Generar prerequisitos secuenciales"}
+            </button>
+            {dependencyResult && (
+              <p className="mt-2 text-xs text-text-secondary">
+                {dependencyResult.created} prerequisito(s) creado(s) · {dependencyResult.skipped} ya existían.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-4 border-t border-border-subtle pt-3">
+            <p className="text-xs text-text-muted">
+              Diagnóstico completo de consistencia entre SQLite y el vault — solo lectura, no corrige nada
+              automáticamente.
+            </p>
+            <button
+              onClick={() => void handleAuditIntegrity()}
+              disabled={auditingIntegrity}
+              className="mt-2 rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              {auditingIntegrity ? "Auditando…" : "Actualizar diagnóstico de integridad"}
+            </button>
+
+            {integrityAudit && (
+              <div className="mt-3 space-y-2 rounded border border-border-subtle bg-background p-3 text-xs">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <DiagnosticItem label="Notas totales" value={String(integrityAudit.totalNotes)} />
+                  <DiagnosticItem label="Con sodiac_id" value={String(integrityAudit.notesWithSodiacId)} tone="success" />
+                  <DiagnosticItem label="Sin sodiac_id" value={String(integrityAudit.notesWithoutSodiacId)} />
+                  <DiagnosticItem
+                    label="Materias sin nota"
+                    value={String(integrityAudit.subjectsWithoutNote.length)}
+                    tone={integrityAudit.subjectsWithoutNote.length > 0 ? "danger" : "success"}
+                  />
+                  <DiagnosticItem
+                    label="Temas sin nota"
+                    value={String(integrityAudit.topicsWithoutNoteCount)}
+                    tone={integrityAudit.topicsWithoutNoteCount > 0 ? "danger" : "success"}
+                  />
+                  <DiagnosticItem
+                    label="Referencias rotas"
+                    value={String(integrityAudit.brokenTopicCompetencyRefs + integrityAudit.brokenSubjectQuestionRefs)}
+                    tone={integrityAudit.brokenTopicCompetencyRefs + integrityAudit.brokenSubjectQuestionRefs > 0 ? "danger" : "success"}
+                  />
+                </div>
+
+                {integrityAudit.brokenTopicCompetencyRefs > 0 && (
+                  <div>
+                    <button
+                      onClick={() => void handleClearBrokenRefs()}
+                      disabled={clearingRefs}
+                      className="rounded border border-danger px-3 py-1.5 text-danger disabled:opacity-40"
+                    >
+                      {clearingRefs
+                        ? "Limpiando…"
+                        : `Limpiar ${integrityAudit.brokenTopicCompetencyRefs} referencia(s) tema→competencia rota(s)`}
+                    </button>
+                    {integrityAudit.brokenSubjectQuestionRefs > 0 && (
+                      <p className="mt-1 text-text-muted">
+                        {integrityAudit.brokenSubjectQuestionRefs} referencia(s) materia→pregunta rota(s) — esa
+                        columna no admite NULL, hay que reasignarlas a mano desde Carrera → materia.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {integrityAudit.duplicateExternalRefs.length > 0 && (
+                  <div>
+                    <p className="font-semibold text-danger">IDs duplicados:</p>
+                    <ul className="mt-1 list-disc pl-4">
+                      {integrityAudit.duplicateExternalRefs.map((d, i) => (
+                        <li key={i}>
+                          {d.table}: {d.externalRef} aparece {d.count} veces
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {integrityAudit.notesLookingLikeTopicsButUntyped.length > 0 && (
+                  <div>
+                    <p className="font-semibold text-warning">
+                      Notas en 05_Temas/ sin type="tema" ({integrityAudit.notesLookingLikeTopicsButUntyped.length}):
+                    </p>
+                    <ul className="mt-1 max-h-24 space-y-0.5 overflow-y-auto">
+                      {integrityAudit.notesLookingLikeTopicsButUntyped.map((p, i) => (
+                        <li key={i} className="flex items-center justify-between gap-2">
+                          <span className="truncate">{p}</span>
+                          <button
+                            onClick={() => void openNoteInObsidian(p)}
+                            className="shrink-0 text-accent hover:underline"
+                          >
+                            Abrir nota
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {integrityAudit.subjectsWithoutNote.length === 0 &&
+                  integrityAudit.topicsWithoutNoteCount === 0 &&
+                  integrityAudit.duplicateExternalRefs.length === 0 &&
+                  integrityAudit.notesLookingLikeTopicsButUntyped.length === 0 &&
+                  integrityAudit.brokenTopicCompetencyRefs === 0 &&
+                  integrityAudit.brokenSubjectQuestionRefs === 0 && (
+                    <p className="text-success">Sin inconsistencias detectadas.</p>
+                  )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {showCreate && canCreate && (
         <form onSubmit={handleCreateNote} className="mt-4 space-y-2 rounded border border-border-subtle bg-surface p-4">

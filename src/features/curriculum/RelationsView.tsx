@@ -1,4 +1,5 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useSearchParams } from "react-router-dom";
 import ReactFlow, {
   Background,
   Controls,
@@ -7,10 +8,11 @@ import ReactFlow, {
   type Edge,
   type Node,
   type NodeMouseHandler,
+  type ReactFlowInstance,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { layoutHorizontal } from "./mapLayout";
-import { RENDERED_TYPES, TYPE_COLOR, TYPE_LABEL, type MapEntityType } from "./mapTypeColors";
+import { OPTIONAL_RENDERED_TYPES, RENDERED_TYPES, TYPE_COLOR, TYPE_LABEL, type MapEntityType } from "./mapTypeColors";
 import { EntityDetailPanel, type SelectedEntity } from "./EntityDetailPanel";
 import type { CurriculumData } from "./useCurriculumData";
 
@@ -34,7 +36,12 @@ function nodeStyle(type: MapEntityType, dimmed: boolean, highlighted: boolean): 
   };
 }
 
-function buildGraph(data: CurriculumData, hiddenTypes: Set<MapEntityType>, collapsedSubjects: Set<string>) {
+function buildGraph(
+  data: CurriculumData,
+  hiddenTypes: Set<MapEntityType>,
+  expandedSubjects: Set<string>,
+  showNotes: boolean,
+) {
   const nodes: Node<NodeData>[] = [];
   const edges: Edge[] = [];
 
@@ -63,18 +70,29 @@ function buildGraph(data: CurriculumData, hiddenTypes: Set<MapEntityType>, colla
   }
 
   for (const s of data.subjects) {
-    if (collapsedSubjects.has(s.id)) continue;
+    if (!expandedSubjects.has(s.id)) continue;
     for (const u of data.units.filter((x) => x.subject_id === s.id)) {
       addNode(u.id, "curriculum_unit", u.title);
       addEdge(s.id, u.id);
     }
   }
+
+  const renderedTopicIds = new Set<string>();
   for (const t of data.topics) {
-    if (collapsedSubjects.has(t.subject_id)) continue;
+    if (!expandedSubjects.has(t.subject_id)) continue;
     addNode(t.id, "topic", t.title);
+    renderedTopicIds.add(t.id);
     if (t.curriculum_unit_id) addEdge(t.curriculum_unit_id, t.id);
     else addEdge(t.subject_id, t.id);
     if (t.competency_id) addEdge(t.competency_id, t.id);
+  }
+
+  if (showNotes && !hiddenTypes.has("obsidian_note")) {
+    for (const note of data.notes) {
+      if (!note.sodiac_id || !renderedTopicIds.has(note.sodiac_id)) continue;
+      addNode(note.id, "obsidian_note", note.title ?? note.vault_relative_path);
+      addEdge(note.sodiac_id, note.id);
+    }
   }
 
   const nodeIds = new Set(nodes.map((n) => n.id));
@@ -84,10 +102,9 @@ function buildGraph(data: CurriculumData, hiddenTypes: Set<MapEntityType>, colla
 }
 
 /**
- * Panel de completitud (H6): a partir de los mismos datos ya cargados por
- * useCurriculumData, sin consultas nuevas — el diagnóstico previo
- * (docs/STARTUP_PERSISTENCE_MAP_DIAGNOSIS.md) confirmó que lo que falta en
- * el Mapa es dato cargado, no código; este panel hace visible esa brecha.
+ * Panel de completitud (H6, ampliado en Fase L con datos reales tras la
+ * reconciliación de la Fase J): a partir de los mismos datos ya cargados
+ * por useCurriculumData, sin consultas nuevas.
  */
 function computeCompleteness(data: CurriculumData) {
   const topicsWithoutUnit = data.topics.filter((t) => !t.curriculum_unit_id).length;
@@ -100,7 +117,7 @@ function computeCompleteness(data: CurriculumData) {
     curriculum_unit: data.units.length,
     topic: data.topics.length,
     project: data.projects.length,
-    obsidian_note: 0,
+    obsidian_note: data.notes.length,
     resource: 0,
   };
   return {
@@ -114,25 +131,72 @@ function computeCompleteness(data: CurriculumData) {
 }
 
 export function RelationsView({ data }: { data: CurriculumData }) {
-  const [hiddenTypes, setHiddenTypes] = useState<Set<MapEntityType>>(new Set());
-  const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [hiddenTypes, setHiddenTypes] = useState<Set<MapEntityType>>(new Set(["obsidian_note"]));
+  const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
+  const [showNotes, setShowNotes] = useState(false);
+  const [search, setSearch] = useState(searchParams.get("buscar") ?? "");
   const [selected, setSelected] = useState<SelectedEntity | null>(null);
   const [showLegend, setShowLegend] = useState(true);
   const [showCompleteness, setShowCompleteness] = useState(true);
   const completeness = useMemo(() => computeCompleteness(data), [data]);
+  const rfInstanceRef = useRef<ReactFlowInstance | null>(null);
+
+  const searchLower = search.trim().toLowerCase();
+
+  // Búsqueda sobre el dataset COMPLETO (492 temas), no solo lo expandido —
+  // si un tema coincide y su materia está colapsada, se expande sola.
+  const fullMatches = useMemo(() => {
+    if (!searchLower) return [];
+    const results: { id: string; type: MapEntityType; subjectId?: string }[] = [];
+    for (const q of data.questions) if (q.title.toLowerCase().includes(searchLower)) results.push({ id: q.id, type: "fundamental_question" });
+    for (const c of data.competencies) if (c.title.toLowerCase().includes(searchLower)) results.push({ id: c.id, type: "competency" });
+    for (const s of data.subjects) if (s.title.toLowerCase().includes(searchLower)) results.push({ id: s.id, type: "subject" });
+    for (const t of data.topics)
+      if (t.title.toLowerCase().includes(searchLower)) results.push({ id: t.id, type: "topic", subjectId: t.subject_id });
+    return results;
+  }, [data, searchLower]);
+
+  useEffect(() => {
+    if (fullMatches.length === 0) return;
+    const subjectsToExpand = fullMatches.map((m) => m.subjectId).filter((id): id is string => !!id);
+    if (subjectsToExpand.length === 0) return;
+    setExpandedSubjects((prev) => {
+      const missing = subjectsToExpand.filter((id) => !prev.has(id));
+      if (missing.length === 0) return prev;
+      const next = new Set(prev);
+      for (const id of missing) next.add(id);
+      return next;
+    });
+  }, [fullMatches]);
+
+  // Si se llega desde el Cronograma Maestro con ?buscar=, prefill una sola vez.
+  useEffect(() => {
+    const initial = searchParams.get("buscar");
+    if (initial) setSearch(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { nodes: rawNodes, edges: rawEdges } = useMemo(
-    () => buildGraph(data, hiddenTypes, collapsedSubjects),
-    [data, hiddenTypes, collapsedSubjects],
+    () => buildGraph(data, hiddenTypes, expandedSubjects, showNotes),
+    [data, hiddenTypes, expandedSubjects, showNotes],
   );
   const positioned = useMemo(() => layoutHorizontal(rawNodes, rawEdges), [rawNodes, rawEdges]);
 
-  const searchLower = search.trim().toLowerCase();
   const matchingIds = useMemo(
-    () => (searchLower ? new Set(positioned.filter((n) => n.data.label.toLowerCase().includes(searchLower)).map((n) => n.id)) : null),
-    [positioned, searchLower],
+    () => (searchLower ? new Set(fullMatches.map((m) => m.id)) : null),
+    [fullMatches, searchLower],
   );
+
+  useEffect(() => {
+    if (!matchingIds || matchingIds.size === 0 || !rfInstanceRef.current) return;
+    const visibleMatches = positioned.filter((n) => matchingIds.has(n.id));
+    if (visibleMatches.length === 0) return;
+    const timeout = setTimeout(() => {
+      rfInstanceRef.current?.fitView({ nodes: visibleMatches, duration: 400, padding: 0.3 });
+    }, 60); // esperar al próximo layout tras expandir materias
+    return () => clearTimeout(timeout);
+  }, [matchingIds, positioned]);
 
   const neighborIds = useMemo(() => {
     if (!selected) return null;
@@ -173,7 +237,7 @@ export function RelationsView({ data }: { data: CurriculumData }) {
 
   const onNodeDoubleClick: NodeMouseHandler = (_evt, node) => {
     if ((node.data as NodeData).entityType !== "subject") return;
-    setCollapsedSubjects((prev) => {
+    setExpandedSubjects((prev) => {
       const next = new Set(prev);
       if (next.has(node.id)) next.delete(node.id);
       else next.add(node.id);
@@ -190,6 +254,17 @@ export function RelationsView({ data }: { data: CurriculumData }) {
     });
   }
 
+  function handleShowAllTopics() {
+    const totalNewNodes = data.topics.filter((t) => !expandedSubjects.has(t.subject_id)).length;
+    if (totalNewNodes > 50) {
+      const confirmed = window.confirm(
+        `Esto va a mostrar ${data.topics.length} temas en total (${totalNewNodes} más de los que ves ahora) y sus conexiones. Puede tardar unos segundos y hacer la vista más difícil de leer. ¿Mostrar todos?`,
+      );
+      if (!confirmed) return;
+    }
+    setExpandedSubjects(new Set(data.subjects.map((s) => s.id)));
+  }
+
   return (
     <div className="relative h-[70vh] rounded border border-border-subtle bg-surface">
       <ReactFlow
@@ -200,6 +275,9 @@ export function RelationsView({ data }: { data: CurriculumData }) {
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
         onPaneClick={() => setSelected(null)}
+        onInit={(instance) => {
+          rfInstanceRef.current = instance;
+        }}
       >
         <Background color="#1D2328" gap={24} />
         <Controls />
@@ -215,10 +293,18 @@ export function RelationsView({ data }: { data: CurriculumData }) {
           <div className="w-64 space-y-2 rounded border border-border bg-surface-elevated p-3">
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar…"
+              onChange={(e) => {
+                setSearch(e.target.value);
+                if (searchParams.get("buscar")) setSearchParams({}, { replace: true });
+              }}
+              placeholder="Buscar entre los 492 temas…"
               className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
             />
+            {searchLower && (
+              <p className="text-[11px] text-text-muted">
+                {fullMatches.length === 0 ? "Sin resultados" : `${fullMatches.length} resultado(s)`}
+              </p>
+            )}
             <button
               onClick={() => setShowLegend((s) => !s)}
               className="text-xs uppercase tracking-wide text-text-secondary hover:text-accent"
@@ -227,7 +313,7 @@ export function RelationsView({ data }: { data: CurriculumData }) {
             </button>
             {showLegend && (
               <ul className="space-y-1">
-                {RENDERED_TYPES.map((type) => (
+                {[...RENDERED_TYPES, ...OPTIONAL_RENDERED_TYPES].map((type) => (
                   <li key={type}>
                     <button
                       onClick={() => toggleType(type)}
@@ -242,6 +328,36 @@ export function RelationsView({ data }: { data: CurriculumData }) {
                 ))}
               </ul>
             )}
+            <div className="space-y-1 border-t border-border-subtle pt-2">
+              <button
+                onClick={handleShowAllTopics}
+                className="block w-full rounded border border-border px-2 py-1 text-left text-[11px] uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
+              >
+                Mostrar todos los temas
+              </button>
+              <button
+                onClick={() => setExpandedSubjects(new Set())}
+                className="block w-full rounded border border-border px-2 py-1 text-left text-[11px] uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
+              >
+                Contraer todas las materias
+              </button>
+              <label className="flex items-center gap-2 px-1 py-0.5 text-[11px] text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={showNotes}
+                  onChange={(e) => {
+                    setShowNotes(e.target.checked);
+                    setHiddenTypes((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.delete("obsidian_note");
+                      else next.add("obsidian_note");
+                      return next;
+                    });
+                  }}
+                />
+                Mostrar notas de Obsidian (de los temas visibles)
+              </label>
+            </div>
             <p className="text-[10px] text-text-muted">Doble clic en una materia colapsa/expande sus temas.</p>
           </div>
         </Panel>
@@ -257,7 +373,7 @@ export function RelationsView({ data }: { data: CurriculumData }) {
             {showCompleteness && (
               <>
                 <ul className="space-y-0.5 text-xs text-text-secondary">
-                  {RENDERED_TYPES.map((type) => (
+                  {[...RENDERED_TYPES, ...OPTIONAL_RENDERED_TYPES].map((type) => (
                     <li key={type} className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
                         <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: TYPE_COLOR[type] }} />

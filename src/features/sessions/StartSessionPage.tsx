@@ -65,7 +65,7 @@ export function StartSessionPage() {
   useEffect(() => {
     void Promise.all([
       fundamentalQuestionsRepo.list({ where: "archived_at IS NULL", orderBy: "sort_order" }),
-      competenciesRepo.list({ where: "archived_at IS NULL", orderBy: "code" }),
+      competenciesRepo.list({ where: "archived_at IS NULL AND origin = 'curriculum'", orderBy: "code" }),
       subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
       topicsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
       getVaultPath(),

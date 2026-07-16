@@ -52,7 +52,7 @@ export function useCareerData(): CareerData {
     setLoading(true);
     void Promise.all([
       fundamentalQuestionsRepo.list({ where: "archived_at IS NULL", orderBy: "sort_order" }),
-      competenciesRepo.list({ where: "archived_at IS NULL", orderBy: "code" }),
+      competenciesRepo.list({ where: "archived_at IS NULL AND origin = 'curriculum'", orderBy: "code" }),
       learningStagesRepo.list({ where: "archived_at IS NULL", orderBy: "sort_order" }),
       subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "sort_order" }),
       curriculumUnitsRepo.list({ where: "archived_at IS NULL", orderBy: "sort_order" }),

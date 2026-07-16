@@ -18,10 +18,10 @@ export const TYPE_COLOR: Record<MapEntityType, string> = {
   fundamental_question: "#00D6C5",
   competency: "#4F7CFF",
   subject: "#8B5CF6",
-  curriculum_unit: "#B05AE8",
+  curriculum_unit: "#C05ADB",
   topic: "#E6B85C",
   obsidian_note: "#43D69A",
-  resource: "#7E8A96",
+  resource: "#8493A1",
   project: "#FF6B72",
 };
 
@@ -37,12 +37,15 @@ export const TYPE_LABEL: Record<MapEntityType, string> = {
 };
 
 /**
- * Tipos efectivamente renderizados como nodos en esta versión del Mapa.
- * `obsidian_note` y `resource` quedan en la paleta (por si se agregan más
- * adelante) pero no se dibujan todavía — requerirían resolver la unión
- * `bibliographic_source` completa, fuera del alcance de este rediseño
- * (que se centró en corregir conectores/layout/colores, no en sumar
- * relaciones nuevas). Decisión de alcance explícita, no una omisión oculta.
+ * Tipos que siempre pueden aparecer como nodo (jerarquía académica —
+ * preguntas/competencias/materias/unidades/temas/proyectos). `obsidian_note`
+ * ya tiene datos reales (495 notas vinculadas por sodiac_id tras la Fase J)
+ * y se agrega como capa opcional, activable con "Mostrar notas" (ver
+ * RelationsView.tsx) — no por defecto, para no duplicar el tamaño del grafo.
+ * `resource` queda en la paleta pero sin renderizar todavía: solo existe 1
+ * vínculo real en `bibliographic_source` (40 recursos, en su mayoría sin
+ * conectar a ninguna entidad académica) — no hay suficiente dato real para
+ * que valga la pena como capa, a diferencia de las notas.
  */
 export const RENDERED_TYPES: MapEntityType[] = [
   "fundamental_question",
@@ -52,3 +55,5 @@ export const RENDERED_TYPES: MapEntityType[] = [
   "topic",
   "project",
 ];
+
+export const OPTIONAL_RENDERED_TYPES: MapEntityType[] = ["obsidian_note"];

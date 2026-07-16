@@ -79,7 +79,8 @@ export function SubjectDetailPage() {
       ]);
 
     const competencyIds = new Set(topics.map((t) => t.competency_id).filter((c): c is string => !!c));
-    const competencies = competencyIds.size > 0 ? await competenciesRepo.list({ where: "archived_at IS NULL" }) : [];
+    const competencies =
+      competencyIds.size > 0 ? await competenciesRepo.list({ where: "archived_at IS NULL AND origin = 'curriculum'" }) : [];
 
     const resourceIds = [...new Set(sources.map((s) => s.resource_id))];
     const resources = resourceIds.length > 0 ? await Promise.all(resourceIds.map((id) => resourcesRepo.getById(id))) : [];

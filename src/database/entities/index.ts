@@ -41,10 +41,14 @@ import type {
   StudyBlockRow,
   StudySessionRow,
   SubjectAssessmentPlanRow,
+  SubjectCompetencyRow,
+  SubjectFundamentalQuestionRow,
   SubjectProgressSnapshotRow,
   SubjectRow,
   TaskHistoryRow,
   TaskRow,
+  TopicCompetencyRow,
+  TopicFundamentalQuestionRow,
   TopicRow,
   UserSettingRow,
   WeeklyPlanRow,
@@ -83,6 +87,12 @@ export const noteLinksRepo = createRepository<NoteLinkRow>("note_link");
 export const resourcesRepo = createRepository<ResourceRow>("resource");
 export const resourceUsageEventsRepo = createRepository<ResourceUsageEventRow>("resource_usage_event");
 export const bibliographicSourcesRepo = createRepository<BibliographicSourceRow>("bibliographic_source");
+
+// --- Reconciliación de currículo con Obsidian (Fase I/J) --------------------------
+export const subjectFundamentalQuestionsRepo = createRepository<SubjectFundamentalQuestionRow>("subject_fundamental_question");
+export const subjectCompetenciesRepo = createRepository<SubjectCompetencyRow>("subject_competency");
+export const topicFundamentalQuestionsRepo = createRepository<TopicFundamentalQuestionRow>("topic_fundamental_question");
+export const topicCompetenciesRepo = createRepository<TopicCompetencyRow>("topic_competency");
 
 // --- Sistema académico de calificaciones, XP, niveles y rangos --------------------------
 export const gradingRubricsRepo = createRepository<GradingRubricRow>("grading_rubric");

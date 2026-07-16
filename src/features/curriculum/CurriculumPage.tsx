@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useCurriculumData } from "./useCurriculumData";
 import { TreeView } from "./TreeView";
 import { TableView } from "./TableView";
@@ -8,7 +9,11 @@ type ViewMode = "arbol" | "tabla" | "mapa";
 
 export function CurriculumPage() {
   const data = useCurriculumData();
-  const [view, setView] = useState<ViewMode>("arbol");
+  const [searchParams] = useSearchParams();
+  // Si se llega con ?buscar= (por ejemplo desde "Abrir en mapa" del Cronograma
+  // Maestro), arrancar directamente en "Mapa de relaciones", que es donde
+  // vive la búsqueda — no en "Árbol".
+  const [view, setView] = useState<ViewMode>(searchParams.get("buscar") ? "mapa" : "arbol");
 
   return (
     <div className="p-8">
