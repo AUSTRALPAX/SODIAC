@@ -384,7 +384,40 @@ export interface ResourceRow extends BaseRow {
   url: string | null;
   area: string | null;
   evaluation_state: string | null;
+  catalog_number: number | null;
+  original_year: number | null;
+  category: string | null;
+  access_label: string | null;
+  access_type:
+    | "pdf_legal"
+    | "texto_legal"
+    | "pdf_texto_legal"
+    | "acceso_institucional"
+    | "catalogo_legal"
+    | "autor_editorial"
+    | "editorial"
+    | "acceso_legal"
+    | "sin_url_verificada"
+    | null;
+  source_document: string | null;
+  source_page: number | null;
+  import_batch: string | null;
 }
+
+export type BibliographicRelationType =
+  | "bibliografia_principal"
+  | "bibliografia_obligatoria"
+  | "bibliografia_complementaria"
+  | "referencia"
+  | "profundizacion"
+  | "aplicacion"
+  | "consulta_tecnica"
+  | "fuente_historica"
+  | "lectura_opcional"
+  | "prerequisito"
+  | "utilizada_en_proyecto"
+  | "citada"
+  | "descartada";
 
 export interface BibliographicSourceRow {
   id: string;
@@ -396,6 +429,13 @@ export interface BibliographicSourceRow {
   project_id: string | null;
   study_session_id: string | null;
   obsidian_note_id: string | null;
+  curriculum_unit_id: string | null;
+  relation_type: BibliographicRelationType | null;
+  importance: number | null;
+  reading_order: number | null;
+  suggested_chapters: string | null;
+  notes: string | null;
+  linked_at: string | null;
   created_at: string;
 }
 

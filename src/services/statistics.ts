@@ -194,3 +194,51 @@ export async function getBottlenecks(limit = 5): Promise<SubjectBottleneck[]> {
 
   return result.slice(0, limit);
 }
+
+export interface BibliographyStats {
+  totalResources: number;
+  resourcesWithLocalFile: number;
+  resourcesWithRelations: number;
+  resourcesWithoutRelations: number;
+  usedInSessions: number;
+  usedInProjects: number;
+  citedCount: number;
+  topAuthors: { author: string; count: number }[];
+}
+
+/** Estadísticas de Biblioteca (sección 19 del pedido) — mismos eventos ya registrados, no cuenta renders. */
+export async function getBibliographyStats(): Promise<BibliographyStats> {
+  const db = await getDb();
+  const [totals, withRelations, usage, authors] = await Promise.all([
+    db.select<Array<{ total: number; withFile: number }>>(
+      `SELECT COUNT(*) as total, SUM(CASE WHEN file_path IS NOT NULL THEN 1 ELSE 0 END) as withFile
+       FROM resource WHERE archived_at IS NULL`,
+    ),
+    db.select<Array<{ resourceId: string }>>(
+      `SELECT DISTINCT resource_id as resourceId FROM bibliographic_source
+       WHERE subject_id IS NOT NULL OR curriculum_unit_id IS NOT NULL OR topic_id IS NOT NULL OR project_id IS NOT NULL`,
+    ),
+    db.select<Array<{ action: string; count: number }>>(
+      `SELECT action, COUNT(DISTINCT resource_id) as count FROM resource_usage_event GROUP BY action`,
+    ),
+    db.select<Array<{ author: string; count: number }>>(
+      `SELECT author, COUNT(*) as count FROM resource WHERE archived_at IS NULL AND author IS NOT NULL
+       GROUP BY author ORDER BY count DESC LIMIT 5`,
+    ),
+  ]);
+
+  const total = totals[0]?.total ?? 0;
+  const withRelationsCount = withRelations.length;
+  const usageByAction = new Map(usage.map((u) => [u.action, u.count]));
+
+  return {
+    totalResources: total,
+    resourcesWithLocalFile: totals[0]?.withFile ?? 0,
+    resourcesWithRelations: withRelationsCount,
+    resourcesWithoutRelations: total - withRelationsCount,
+    usedInSessions: usageByAction.get("utilizado_en_sesion") ?? 0,
+    usedInProjects: usageByAction.get("utilizado_en_proyecto") ?? 0,
+    citedCount: usageByAction.get("citado") ?? 0,
+    topAuthors: authors,
+  };
+}

@@ -6,6 +6,7 @@ import {
   studyBlocksRepo,
   pomodoroCyclesRepo,
   competenciesRepo,
+  resourcesRepo,
   subjectsRepo,
   topicsRepo,
   studySessionsRepo,
@@ -13,6 +14,7 @@ import {
 import type {
   CompetencyRow,
   ObsidianNoteRow,
+  ResourceRow,
   StudyBlockRow,
   StudySessionRow,
   SubjectRow,
@@ -26,6 +28,8 @@ import {
   recordComprobacion,
   saveSessionDraft,
 } from "@/services/sessions";
+import { getBibliographyForSubject, getBibliographyForTopic, openResource } from "@/services/library";
+import { recordResourceUsage } from "@/services/resourceUsage";
 import { registerPendingSave } from "@/services/closeGuard";
 import { createNoteFromTemplate, getVaultPath, indexVault, openNoteInObsidian, openVaultInObsidian } from "@/services/obsidian";
 import {
@@ -113,6 +117,8 @@ export function ActiveSessionPage() {
   // Nota de Obsidian vinculada al tema de esta sesión (por sodiac_id) — para
   // que "Abrir Obsidian" lleve directo a la nota, no solo al vault.
   const [relatedNote, setRelatedNote] = useState<ObsidianNoteRow | null>(null);
+  const [relatedResources, setRelatedResources] = useState<ResourceRow[]>([]);
+  const [usedResourceIds, setUsedResourceIds] = useState<Set<string>>(new Set());
   const [showMissingNoteInfo, setShowMissingNoteInfo] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
   const [createNoteError, setCreateNoteError] = useState<string | null>(null);
@@ -155,6 +161,15 @@ export function ActiveSessionPage() {
       setRelatedTask(task && !task.completed_at ? task : null);
       setSubject(subj && !subj.completed_at ? subj : null);
       setRelatedNote(notes[0] ?? null);
+
+      const bibliographyLinks = [
+        ...(row.topic_id ? await getBibliographyForTopic(row.topic_id) : []),
+        ...(row.subject_id ? await getBibliographyForSubject(row.subject_id) : []),
+      ];
+      const resourceIds = [...new Set(bibliographyLinks.map((l) => l.resource_id))];
+      const fetchedResources =
+        resourceIds.length > 0 ? await Promise.all(resourceIds.map((rid) => resourcesRepo.getById(rid))) : [];
+      setRelatedResources(fetchedResources.filter((r): r is ResourceRow => r != null));
 
       const [taskPreview, topicPreview, subjectPreview, gate] = await Promise.all([
         task && !task.completed_at ? previewTaskCompletion(task) : Promise.resolve(null),
@@ -382,6 +397,19 @@ export function ActiveSessionPage() {
     }
   }
 
+  /** Abre el recurso si tiene archivo/enlace (eso ya registra "abierto") y siempre marca "usado en esta sesión". */
+  async function handleUseResource(resource: ResourceRow) {
+    if (resource.file_path || resource.url) {
+      try {
+        await openResource(resource);
+      } catch {
+        // Sin archivo/URL válido — igual se registra el uso más abajo.
+      }
+    }
+    await recordResourceUsage({ resourceId: resource.id, sessionId: id ?? null, action: "utilizado_en_sesion" });
+    setUsedResourceIds((prev) => new Set(prev).add(resource.id));
+  }
+
   if (loading) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
   if (!session) return <div className="p-10 text-sm text-danger">La sesión no existe.</div>;
 
@@ -462,6 +490,32 @@ export function ActiveSessionPage() {
           </ul>
         )}
       </section>
+
+      {relatedResources.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Bibliografía relacionada</h2>
+          <ul className="mt-1 space-y-1 rounded border border-border-subtle bg-surface p-3 text-sm text-text-secondary">
+            {relatedResources.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-2">
+                <span>
+                  {r.title}
+                  {r.author ? ` — ${r.author}` : ""}
+                </span>
+                <button
+                  onClick={() => void handleUseResource(r)}
+                  className={`shrink-0 rounded border px-2 py-0.5 text-xs uppercase tracking-wide ${
+                    usedResourceIds.has(r.id)
+                      ? "border-success text-success"
+                      : "border-border text-text-secondary hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  {usedResourceIds.has(r.id) ? "Usado en esta sesión" : "Usar este recurso"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {session.resources && (
         <section>

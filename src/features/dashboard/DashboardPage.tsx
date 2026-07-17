@@ -14,6 +14,7 @@ import {
   ZAxis,
 } from "recharts";
 import { SodiacLogo } from "@/components/brand/SodiacLogo";
+import { PomodoroSection } from "./PomodoroSection";
 import { subjectsRepo } from "@/database/entities";
 import { getSetting, setSetting } from "@/services/settings";
 import {
@@ -57,6 +58,7 @@ const TOOLTIP_STYLE = {
 };
 
 const WIDGET_LABEL: Record<DashboardWidgetId, string> = {
+  pomodoro: "Temporizador Pomodoro",
   trayectoria: "Trayectoria académica",
   resumen: "Resumen",
   heatmap: "Calendario de actividad",
@@ -302,6 +304,8 @@ export function DashboardPage() {
       <div className="space-y-10 p-10">
         {visibleOrder.map((id) => {
           switch (id) {
+            case "pomodoro":
+              return <PomodoroSection key={id} />;
             case "trayectoria":
               return <TrayectoriaSection key={id} />;
             case "resumen":

@@ -423,12 +423,13 @@ export async function getUpcomingAgenda(): Promise<AgendaItem[]> {
 
 export const DASHBOARD_WIDGET_IDS = [
   "trayectoria",
+  "pomodoro",
+  "agenda",
   "resumen",
   "heatmap",
   "progreso",
   "temporal",
   "sistema",
-  "agenda",
 ] as const;
 export type DashboardWidgetId = (typeof DASHBOARD_WIDGET_IDS)[number];
 

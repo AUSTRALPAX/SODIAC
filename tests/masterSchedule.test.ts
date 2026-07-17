@@ -118,6 +118,7 @@ describe("Cronograma Maestro — orden por rutas del vault (Fase K)", () => {
       topicCompetencyLinks: [],
       notes: [],
       dependencies: [],
+      bibliographicSources: [],
     });
 
     // MAT-02 aparece en RUTA-00 (primera), MAT-01 en RUTA-01 (segunda) —
@@ -152,6 +153,7 @@ describe("Cronograma Maestro — orden por rutas del vault (Fase K)", () => {
       topicCompetencyLinks: [],
       notes: [],
       dependencies: [],
+      bibliographicSources: [],
     });
 
     expect(schedule.steps.map((s) => s.subject.title)).toEqual(["Materia del vault", "Legacy A", "Legacy B"]);
@@ -179,6 +181,7 @@ describe("Cronograma Maestro — orden por rutas del vault (Fase K)", () => {
       topicCompetencyLinks: [],
       notes: [],
       dependencies: [],
+      bibliographicSources: [],
     });
 
     expect(schedule.totalSteps).toBe(3);
@@ -218,6 +221,7 @@ describe("Cronograma Maestro — orden por rutas del vault (Fase K)", () => {
           updated_at: "",
         },
       ],
+      bibliographicSources: [],
     });
 
     const step2 = schedule.steps.find((s) => s.topic.id === "t2")!;

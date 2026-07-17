@@ -22,6 +22,7 @@ import { obsidianNotesRepo } from "@/database/entities";
 import { getInProgressSession } from "@/services/sessions";
 import { computeSubjectBudgetShare, COMPLETION_CATEGORY_WEIGHTS } from "@/services/xp";
 import type {
+  BibliographicSourceRow,
   CompetencyRow,
   CurriculumDependencyRow,
   FundamentalQuestionRow,
@@ -55,6 +56,7 @@ export interface ScheduleStep {
   status: ScheduleStepStatus;
   xpAvailable: number;
   relatedNoteCount: number;
+  relatedResourceCount: number;
   /** Prerequisitos reales (curriculum_dependency), no solo el orden implícito. */
   prerequisiteTopics: TopicRow[];
 }
@@ -142,6 +144,7 @@ export interface BuildMasterScheduleInput {
   topicCompetencyLinks: TopicCompetencyRow[];
   notes: ObsidianNoteRow[]; // solo las que tienen sodiac_id
   dependencies: CurriculumDependencyRow[];
+  bibliographicSources: BibliographicSourceRow[];
 }
 
 export async function buildMasterSchedule(input: BuildMasterScheduleInput): Promise<MasterSchedule> {
@@ -154,6 +157,11 @@ export async function buildMasterSchedule(input: BuildMasterScheduleInput): Prom
   for (const note of input.notes) {
     if (!note.sodiac_id) continue;
     noteCountByEntityId.set(note.sodiac_id, (noteCountByEntityId.get(note.sodiac_id) ?? 0) + 1);
+  }
+  const resourceCountByTopicId = new Map<string, number>();
+  for (const link of input.bibliographicSources) {
+    if (!link.topic_id) continue;
+    resourceCountByTopicId.set(link.topic_id, (resourceCountByTopicId.get(link.topic_id) ?? 0) + 1);
   }
 
   const secondaryQuestionsBySubject = new Map<string, string[]>();
@@ -265,6 +273,7 @@ export async function buildMasterSchedule(input: BuildMasterScheduleInput): Prom
         status,
         xpAvailable: Math.round(xpPerTopic),
         relatedNoteCount: noteCountByEntityId.get(topic.id) ?? 0,
+        relatedResourceCount: resourceCountByTopicId.get(topic.id) ?? 0,
         prerequisiteTopics,
       });
     }

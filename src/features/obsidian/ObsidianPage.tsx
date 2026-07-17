@@ -38,6 +38,11 @@ import {
   type ReconciliationSummary,
   type SequentialDependencyResult,
 } from "@/services/curriculumReconciliation";
+import {
+  clearOrphanedBibliographicLinks,
+  computeBibliographyIntegrityAudit,
+  type BibliographyIntegrityAudit,
+} from "@/services/bibliographyIntegrity";
 import type { ObsidianNoteRow, ObsidianPermissionMode } from "@/database/types";
 
 const SYNC_STATE_LABEL: Record<ObsidianNoteRow["sync_state"], string> = {
@@ -91,6 +96,9 @@ export function ObsidianPage() {
   const [integrityAudit, setIntegrityAudit] = useState<AcademicIntegrityAudit | null>(null);
   const [auditingIntegrity, setAuditingIntegrity] = useState(false);
   const [clearingRefs, setClearingRefs] = useState(false);
+  const [bibliographyAudit, setBibliographyAudit] = useState<BibliographyIntegrityAudit | null>(null);
+  const [auditingBibliography, setAuditingBibliography] = useState(false);
+  const [clearingOrphanedLinks, setClearingOrphanedLinks] = useState(false);
   const [dependencyResult, setDependencyResult] = useState<SequentialDependencyResult | null>(null);
   const [generatingDependencies, setGeneratingDependencies] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
@@ -177,6 +185,30 @@ export function ObsidianPage() {
       setIntegrityAudit(await computeAcademicIntegrityAudit());
     } finally {
       setAuditingIntegrity(false);
+    }
+  }
+
+  async function handleAuditBibliography() {
+    setAuditingBibliography(true);
+    try {
+      setBibliographyAudit(await computeBibliographyIntegrityAudit());
+    } finally {
+      setAuditingBibliography(false);
+    }
+  }
+
+  async function handleClearOrphanedLinks() {
+    if (!bibliographyAudit) return;
+    const confirmed = window.confirm(
+      `Esto va a borrar ${bibliographyAudit.orphanedLinks} vínculo(s) bibliográfico(s) sin ninguna materia/unidad/tema/proyecto asociado. No borra ningún recurso. ¿Continuar?`,
+    );
+    if (!confirmed) return;
+    setClearingOrphanedLinks(true);
+    try {
+      await clearOrphanedBibliographicLinks();
+      setBibliographyAudit(await computeBibliographyIntegrityAudit());
+    } finally {
+      setClearingOrphanedLinks(false);
     }
   }
 
@@ -778,6 +810,82 @@ export function ObsidianPage() {
           </div>
         </section>
       )}
+
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          Integridad bibliográfica
+        </h2>
+        <p className="mt-1 text-xs text-text-muted">
+          Diagnóstico del catálogo austrofinanciero y sus vínculos — solo lectura, no corrige nada automáticamente.
+        </p>
+        <button
+          onClick={() => void handleAuditBibliography()}
+          disabled={auditingBibliography}
+          className="mt-2 rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+        >
+          {auditingBibliography ? "Auditando…" : "Actualizar diagnóstico bibliográfico"}
+        </button>
+
+        {bibliographyAudit && (
+          <div className="mt-3 space-y-2 rounded border border-border-subtle bg-background p-3 text-xs">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <DiagnosticItem label="Obras esperadas (catálogo)" value={String(bibliographyAudit.expectedAustrofinancialWorks)} />
+              <DiagnosticItem
+                label="Obras importadas"
+                value={String(bibliographyAudit.importedAustrofinancialWorks)}
+                tone={
+                  bibliographyAudit.importedAustrofinancialWorks === bibliographyAudit.expectedAustrofinancialWorks
+                    ? "success"
+                    : "danger"
+                }
+              />
+              <DiagnosticItem label="Total de recursos activos" value={String(bibliographyAudit.totalActiveResources)} />
+              <DiagnosticItem
+                label="Números de catálogo duplicados"
+                value={String(bibliographyAudit.duplicateCatalogNumbers.length)}
+                tone={bibliographyAudit.duplicateCatalogNumbers.length > 0 ? "danger" : "success"}
+              />
+              <DiagnosticItem label="Sin categoría" value={String(bibliographyAudit.resourcesWithoutCategory)} />
+              <DiagnosticItem label="Sin año" value={String(bibliographyAudit.resourcesWithoutYear)} />
+              <DiagnosticItem label="Sin acceso registrado" value={String(bibliographyAudit.resourcesWithoutAccess)} />
+              <DiagnosticItem label="Sin materia/tema/proyecto" value={String(bibliographyAudit.resourcesWithoutAcademicLinks)} />
+              <DiagnosticItem
+                label="Vínculos huérfanos"
+                value={String(bibliographyAudit.orphanedLinks)}
+                tone={bibliographyAudit.orphanedLinks > 0 ? "danger" : "success"}
+              />
+            </div>
+
+            {bibliographyAudit.duplicateCatalogNumbers.length > 0 && (
+              <ul className="space-y-0.5 text-danger">
+                {bibliographyAudit.duplicateCatalogNumbers.map((d) => (
+                  <li key={d.catalogNumber}>
+                    Catálogo #{d.catalogNumber}: {d.count} recursos con el mismo número.
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {bibliographyAudit.orphanedLinks > 0 && (
+              <button
+                onClick={() => void handleClearOrphanedLinks()}
+                disabled={clearingOrphanedLinks}
+                className="rounded border border-danger px-3 py-1.5 text-danger disabled:opacity-40"
+              >
+                {clearingOrphanedLinks
+                  ? "Limpiando…"
+                  : `Limpiar ${bibliographyAudit.orphanedLinks} vínculo(s) huérfano(s)`}
+              </button>
+            )}
+
+            {bibliographyAudit.duplicateCatalogNumbers.length === 0 &&
+              bibliographyAudit.orphanedLinks === 0 &&
+              bibliographyAudit.importedAustrofinancialWorks === bibliographyAudit.expectedAustrofinancialWorks && (
+                <p className="text-success">Sin inconsistencias detectadas.</p>
+              )}
+          </div>
+        )}
+      </section>
 
       {showCreate && canCreate && (
         <form onSubmit={handleCreateNote} className="mt-4 space-y-2 rounded border border-border-subtle bg-surface p-4">

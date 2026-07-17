@@ -90,6 +90,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/0011_curriculum_reconciliation.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 12,
+            description: "bibliography_austrofinancial",
+            sql: include_str!("../../migrations/0012_bibliography_austrofinancial.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

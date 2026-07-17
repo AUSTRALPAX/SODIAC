@@ -90,6 +90,14 @@ export async function importLibraryInstitutionalBase(): Promise<LibraryImportSum
           created_at: now(),
           updated_at: now(),
           archived_at: null,
+          catalog_number: null,
+          original_year: null,
+          category: null,
+          access_label: null,
+          access_type: null,
+          source_document: null,
+          source_page: null,
+          import_batch: "biblioteca_institucional",
         };
         await resourcesRepo.insert(row, "sistema");
         summary.imported++;

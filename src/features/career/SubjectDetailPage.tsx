@@ -15,6 +15,7 @@ import {
 } from "@/database/entities";
 import type {
   AcademicTranscriptEntryRow,
+  BibliographicSourceRow,
   CompetencyRow,
   CurriculumUnitRow,
   FundamentalQuestionRow,
@@ -25,6 +26,22 @@ import type {
   SubjectRow,
   TopicRow,
 } from "@/database/types";
+
+const RELATION_TYPE_LABEL: Record<NonNullable<BibliographicSourceRow["relation_type"]>, string> = {
+  bibliografia_principal: "Principal",
+  bibliografia_obligatoria: "Obligatoria",
+  bibliografia_complementaria: "Complementaria",
+  referencia: "Referencia",
+  profundizacion: "Profundización",
+  aplicacion: "Aplicación",
+  consulta_tecnica: "Consulta técnica",
+  fuente_historica: "Fuente histórica",
+  lectura_opcional: "Lectura opcional",
+  prerequisito: "Prerequisito",
+  utilizada_en_proyecto: "Utilizada en proyecto",
+  citada: "Citada",
+  descartada: "Descartada",
+};
 import { getSubjectXpBudgetTotal, getSubjectXpTotal } from "@/services/xp";
 import {
   checkSubjectCompletionGate,
@@ -46,6 +63,7 @@ interface SubjectDetail {
   sessions: StudySessionRow[];
   transcript: AcademicTranscriptEntryRow[];
   resources: ResourceRow[];
+  bibliography: BibliographicSourceRow[];
   xpObtained: number;
   xpBudgetTotal: number;
 }
@@ -96,6 +114,7 @@ export function SubjectDetailPage() {
       sessions,
       transcript,
       resources: resources.filter((r): r is ResourceRow => r != null),
+      bibliography: sources,
       xpObtained: xpObtained,
       xpBudgetTotal: xpBudget.total,
     });
@@ -110,7 +129,7 @@ export function SubjectDetailPage() {
   if (loading) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
   if (!detail) return <div className="p-10 text-sm text-danger">La materia indicada no existe.</div>;
 
-  const { subject, stage, question, competencies, units, topics, projects, sessions, transcript, resources, xpObtained, xpBudgetTotal } = detail;
+  const { subject, stage, question, competencies, units, topics, projects, sessions, transcript, resources, bibliography, xpObtained, xpBudgetTotal } = detail;
   const completedTopics = topics.filter((t) => t.completed_at).length;
   const progressPct = topics.length > 0 ? Math.round((completedTopics / topics.length) * 100) : 0;
   const xpTotal = xpBudgetTotal;
@@ -215,9 +234,18 @@ export function SubjectDetailPage() {
           <p className="mt-1 text-xs text-text-muted">Sin bibliografía vinculada todavía.</p>
         ) : (
           <ul className="mt-1 space-y-0.5 text-sm text-text-secondary">
-            {resources.map((r) => (
-              <li key={r.id}>· {r.title}</li>
-            ))}
+            {resources.map((r) => {
+              const link = bibliography.find((b) => b.resource_id === r.id);
+              return (
+                <li key={r.id}>
+                  · {r.title}
+                  {r.author ? ` — ${r.author}` : ""}
+                  {link?.relation_type && (
+                    <span className="ml-1.5 text-xs text-text-muted">({RELATION_TYPE_LABEL[link.relation_type]})</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

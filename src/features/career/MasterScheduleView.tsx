@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  bibliographicSourcesRepo,
   curriculumDependenciesRepo,
   obsidianNotesRepo,
   subjectCompetenciesRepo,
@@ -49,7 +50,7 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [subjectQuestionLinks, subjectCompetencyLinks, topicQuestionLinks, topicCompetencyLinks, notes, dependencies] =
+    const [subjectQuestionLinks, subjectCompetencyLinks, topicQuestionLinks, topicCompetencyLinks, notes, dependencies, bibliographicSources] =
       await Promise.all([
         subjectFundamentalQuestionsRepo.list(),
         subjectCompetenciesRepo.list(),
@@ -57,6 +58,7 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
         topicCompetenciesRepo.list(),
         obsidianNotesRepo.list({ where: "sodiac_id IS NOT NULL" }),
         curriculumDependenciesRepo.list(),
+        bibliographicSourcesRepo.list({ where: "topic_id IS NOT NULL" }),
       ]);
     const result = await buildMasterSchedule({
       subjects: data.subjects,
@@ -69,6 +71,7 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
       topicQuestionLinks,
       topicCompetencyLinks,
       notes,
+      bibliographicSources,
     });
     setSchedule(result);
     setLoading(false);
@@ -224,6 +227,7 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
               onOpenSubject={() => navigate(`/carrera/${step.subject.id}`)}
               onOpenNotes={() => void handleOpenNotes(step)}
               onOpenMap={() => navigate(`/mapa?buscar=${encodeURIComponent(step.topic.title)}`)}
+              onOpenBibliography={() => navigate(`/biblioteca?tema=${step.topic.id}`)}
               onSchedule={() => setSchedulingStep(step)}
             />
           ))}
@@ -261,6 +265,7 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
                         onOpenSubject={() => navigate(`/carrera/${step.subject.id}`)}
                         onOpenNotes={() => void handleOpenNotes(step)}
                         onOpenMap={() => navigate(`/mapa?buscar=${encodeURIComponent(step.topic.title)}`)}
+                        onOpenBibliography={() => navigate(`/biblioteca?tema=${step.topic.id}`)}
                         onSchedule={() => setSchedulingStep(step)}
                         hideSubjectLabel
                       />
@@ -336,6 +341,7 @@ function ScheduleRow({
   onOpenSubject,
   onOpenNotes,
   onOpenMap,
+  onOpenBibliography,
   onSchedule,
 }: {
   step: ScheduleStep;
@@ -348,6 +354,7 @@ function ScheduleRow({
   onOpenSubject: () => void;
   onOpenNotes: () => void;
   onOpenMap: () => void;
+  onOpenBibliography: () => void;
   onSchedule: () => void;
 }) {
   const isDone = step.status === "completado";
@@ -394,6 +401,10 @@ function ScheduleRow({
             <span className="text-text-muted">Notas de Obsidian relacionadas: </span>
             {step.relatedNoteCount}
           </p>
+          <p>
+            <span className="text-text-muted">Bibliografía recomendada: </span>
+            {step.relatedResourceCount}
+          </p>
           <p className="text-text-muted">
             {step.prerequisiteTopics.length === 0
               ? "Requisito: ninguno — es el primero de esta materia."
@@ -430,6 +441,14 @@ function ScheduleRow({
                 className="rounded border border-border px-2 py-1 text-[11px] uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
               >
                 Abrir notas
+              </button>
+            )}
+            {step.relatedResourceCount > 0 && (
+              <button
+                onClick={onOpenBibliography}
+                className="rounded border border-border px-2 py-1 text-[11px] uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
+              >
+                Ver bibliografía
               </button>
             )}
             {!isDone && (

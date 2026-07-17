@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  getBibliographyStats,
   getBlockDistribution,
   getBottlenecks,
   getMasteryEvolution,
@@ -18,6 +19,7 @@ import {
   getSessionActivity,
   getSubjectCompletionRates,
   getXpEvolution,
+  type BibliographyStats,
   type BlockDistribution,
   type MasteryEvolutionPoint,
   type ReviewStats,
@@ -54,6 +56,7 @@ export function StatisticsPage() {
   const [completionRates, setCompletionRates] = useState<SubjectCompletionRate[]>([]);
   const [levelProgress, setLevelProgress] = useState<LevelProgress | null>(null);
   const [rank, setRank] = useState<AcademicRankRow | null>(null);
+  const [bibliography, setBibliography] = useState<BibliographyStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,7 +69,8 @@ export function StatisticsPage() {
       getXpEvolution(30),
       getSubjectCompletionRates(),
       getLevelProgress(),
-    ]).then(async ([a, m, r, b, bo, xp, cr, lp]) => {
+      getBibliographyStats(),
+    ]).then(async ([a, m, r, b, bo, xp, cr, lp, bib]) => {
       setActivity(a);
       setMastery(m);
       setReviewStats(r);
@@ -76,6 +80,7 @@ export function StatisticsPage() {
       setCompletionRates(cr);
       setLevelProgress(lp);
       setRank(await getRankForLevel(lp.level));
+      setBibliography(bib);
       setLoading(false);
     });
   }, []);
@@ -108,6 +113,30 @@ export function StatisticsPage() {
           </div>
           <StatTile label="XP total" value={Math.round(levelProgress.xpTotal)} />
           <StatTile label="% del nivel" value={Math.round(levelProgress.percentOfLevel)} />
+        </section>
+      )}
+
+      {bibliography && (
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Biblioteca</h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <StatTile label="Total de obras" value={bibliography.totalResources} />
+            <StatTile label="Con archivo local" value={bibliography.resourcesWithLocalFile} />
+            <StatTile label="Con relaciones académicas" value={bibliography.resourcesWithRelations} tone="success" />
+            <StatTile label="Sin relaciones" value={bibliography.resourcesWithoutRelations} />
+            <StatTile label="Usadas en sesiones" value={bibliography.usedInSessions} tone="accent" />
+            <StatTile label="Usadas en proyectos" value={bibliography.usedInProjects} />
+          </div>
+          {bibliography.topAuthors.length > 0 && (
+            <ul className="mt-3 space-y-1 rounded border border-border-subtle bg-surface p-3 text-xs text-text-secondary">
+              {bibliography.topAuthors.map((a) => (
+                <li key={a.author} className="flex items-center justify-between">
+                  <span>{a.author}</span>
+                  <span className="text-text-muted">{a.count} obra(s)</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 
