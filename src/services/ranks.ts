@@ -1,6 +1,7 @@
 import academicRanksSeed from "../../seed/academic-ranks.json";
 import { RANK_IMAGES_BY_FILE } from "@/assets/ranks";
 import { academicRanksRepo } from "@/database/entities";
+import { getDb } from "@/database/client";
 import type { AcademicRankRow } from "@/database/types";
 
 const now = () => new Date().toISOString();
@@ -47,7 +48,7 @@ export async function ensureDefaultRanks(): Promise<void> {
 }
 
 export async function listRanks(): Promise<AcademicRankRow[]> {
-  return academicRanksRepo.list({ orderBy: "sort_order ASC" });
+  return academicRanksRepo.list({ where: "is_active = 1", orderBy: "sort_order ASC" });
 }
 
 export async function getRankForLevel(level: number): Promise<AcademicRankRow | null> {
@@ -117,10 +118,8 @@ export async function exportRanks(): Promise<AcademicRankRow[]> {
 
 /** Restaura los 15 rangos por defecto — borra los actuales y vuelve a sembrar. */
 export async function restoreDefaultRanks(): Promise<void> {
-  const existing = await academicRanksRepo.list();
-  for (const rank of existing) {
-    await academicRanksRepo.update(rank.id, { is_active: 0, updated_at: now() });
-  }
+  const db = await getDb();
+  await db.execute("DELETE FROM academic_rank");
   for (const [index, entry] of seed.entries()) {
     const row: AcademicRankRow = {
       id: crypto.randomUUID(),
