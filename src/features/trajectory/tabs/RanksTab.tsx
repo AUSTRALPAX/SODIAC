@@ -99,12 +99,20 @@ export function RanksTab({ currentLevel, onChanged }: { currentLevel: number; on
                 isCurrent ? "border-accent bg-accent/5" : "border-border-subtle bg-surface"
               } ${!rank.is_active ? "opacity-40" : ""}`}
             >
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xs font-semibold"
-                style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
-              >
-                {rankInitials(rank.name)}
-              </div>
+              {rank.badge ? (
+                <img
+                  src={rank.badge}
+                  alt={rank.name}
+                  className="h-10 w-10 shrink-0 rounded-full border border-accent object-cover"
+                />
+              ) : (
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xs font-semibold"
+                  style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                >
+                  {rankInitials(rank.name)}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 {editingId === rank.id ? (
                   <div className="flex flex-wrap items-center gap-2">

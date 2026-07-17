@@ -1,4 +1,5 @@
 import academicRanksSeed from "../../seed/academic-ranks.json";
+import { RANK_IMAGES_BY_FILE } from "@/assets/ranks";
 import { academicRanksRepo } from "@/database/entities";
 import type { AcademicRankRow } from "@/database/types";
 
@@ -9,9 +10,14 @@ interface RankSeedEntry {
   subtitle: string;
   minimumLevel: number;
   maximumLevel: number;
+  imageFile?: string;
 }
 
 const seed = academicRanksSeed as RankSeedEntry[];
+
+function badgeForEntry(entry: RankSeedEntry): string | null {
+  return entry.imageFile ? (RANK_IMAGES_BY_FILE[entry.imageFile] ?? null) : null;
+}
 
 export const RANK_NARRATIVE_DISCLAIMER =
   "Los rangos representan una narrativa personal de aprendizaje. No constituyen una clasificación académica o una jerarquía objetiva entre autores.";
@@ -30,7 +36,7 @@ export async function ensureDefaultRanks(): Promise<void> {
       minimum_level: entry.minimumLevel,
       maximum_level: entry.maximumLevel,
       sort_order: index,
-      badge: null,
+      badge: badgeForEntry(entry),
       color_token: index % 2 === 0 ? "accent" : "turquoise",
       is_active: 1,
       created_at: now(),
@@ -85,15 +91,16 @@ export async function updateRank(rankId: string, input: UpdateRankInput): Promis
 }
 
 /**
- * Intercambia nombre/subtítulo entre dos rangos, sin tocar sus rangos de
- * nivel ni su sort_order — así "cambiar de lugar" a dos autores no
- * desordena el resto de la lista (que sigue viva por nivel).
+ * Intercambia identidad (nombre, subtítulo, retrato) entre dos rangos, sin
+ * tocar sus rangos de nivel ni su sort_order — así "cambiar de lugar" a dos
+ * autores no desordena el resto de la lista (que sigue viva por nivel), y el
+ * retrato viaja con la persona, no se queda pegado al nivel.
  */
 export async function swapRankIdentities(rankIdA: string, rankIdB: string): Promise<void> {
   const [a, b] = await Promise.all([academicRanksRepo.getById(rankIdA), academicRanksRepo.getById(rankIdB)]);
   if (!a || !b) throw new Error("No se encontraron ambos rangos para intercambiar.");
-  await academicRanksRepo.update(a.id, { name: b.name, subtitle: b.subtitle, updated_at: now() });
-  await academicRanksRepo.update(b.id, { name: a.name, subtitle: a.subtitle, updated_at: now() });
+  await academicRanksRepo.update(a.id, { name: b.name, subtitle: b.subtitle, badge: b.badge, updated_at: now() });
+  await academicRanksRepo.update(b.id, { name: a.name, subtitle: a.subtitle, badge: a.badge, updated_at: now() });
 }
 
 export async function setRankActive(rankId: string, isActive: boolean): Promise<void> {
@@ -123,7 +130,7 @@ export async function restoreDefaultRanks(): Promise<void> {
       minimum_level: entry.minimumLevel,
       maximum_level: entry.maximumLevel,
       sort_order: index,
-      badge: null,
+      badge: badgeForEntry(entry),
       color_token: index % 2 === 0 ? "accent" : "turquoise",
       is_active: 1,
       created_at: now(),
