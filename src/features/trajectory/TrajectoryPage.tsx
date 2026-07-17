@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { TRAJECTORY_VIEW_DEFAULTS, trajectoryViewPreferenceSchema } from "@/schemas/viewPreferences";
 import { getLevelProgress, type LevelProgress } from "@/services/xp";
 import { getRankForLevel, getNextRank, ensureDefaultRanks, RANK_NARRATIVE_DISCLAIMER } from "@/services/ranks";
 import { computeIpa, ensureCurrentFormulaVersion } from "@/services/progress";
@@ -26,7 +28,12 @@ const TABS: { id: TabId; label: string }[] = [
 
 export function TrajectoryPage() {
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<TabId>("resumen");
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference(
+    "trajectory",
+    trajectoryViewPreferenceSchema,
+    TRAJECTORY_VIEW_DEFAULTS,
+  );
+  const tab = viewPrefs.tab as TabId;
   const [levelProgress, setLevelProgress] = useState<LevelProgress | null>(null);
   const [currentRank, setCurrentRank] = useState<AcademicRankRow | null>(null);
   const [nextRank, setNextRank] = useState<AcademicRankRow | null>(null);
@@ -85,7 +92,7 @@ export function TrajectoryPage() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => updateViewPrefs({ tab: t.id }, { immediate: true })}
             className={`rounded-t px-3 py-2 text-xs uppercase tracking-wide ${
               tab === t.id ? "border-b-2 border-accent text-accent" : "text-text-secondary hover:text-text-primary"
             }`}

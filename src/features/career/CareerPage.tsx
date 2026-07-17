@@ -1,5 +1,6 @@
-import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { CAREER_VIEW_DEFAULTS, careerViewPreferenceSchema } from "@/schemas/viewPreferences";
 import { useCareerData } from "./useCareerData";
 import { RecorridoView } from "./RecorridoView";
 import { MallaView } from "./MallaView";
@@ -26,9 +27,13 @@ export function CareerPage() {
   // "Abrir en Cronograma Maestro" del panel del Mapa) directamente en esa
   // pestaña, con la búsqueda prellenada.
   const tabParam = searchParams.get("tab");
-  const [view, setView] = useState<CareerViewMode>(
-    tabParam && VALID_VIEWS.has(tabParam as CareerViewMode) ? (tabParam as CareerViewMode) : "recorrido",
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference(
+    "career",
+    careerViewPreferenceSchema,
+    CAREER_VIEW_DEFAULTS,
   );
+  const view: CareerViewMode =
+    tabParam && VALID_VIEWS.has(tabParam as CareerViewMode) ? (tabParam as CareerViewMode) : (viewPrefs.view as CareerViewMode);
 
   return (
     <div className="p-8">
@@ -41,7 +46,7 @@ export function CareerPage() {
           {(["recorrido", "malla", "temario", "cronograma", "cronograma-maestro"] as const).map((mode) => (
             <button
               key={mode}
-              onClick={() => setView(mode)}
+              onClick={() => updateViewPrefs({ view: mode }, { immediate: true })}
               className={`rounded px-3 py-1 text-xs uppercase tracking-wide ${
                 view === mode ? "bg-surface-elevated text-accent" : "text-text-secondary hover:text-text-primary"
               }`}

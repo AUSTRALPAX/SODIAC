@@ -500,6 +500,10 @@ export interface BackupRecordRow {
   created_at: string;
   restored_at: string | null;
   restore_result: string | null;
+  status: "verificado" | "incompleto" | "corrupto" | "incompatible" | null;
+  schema_version: number | null;
+  record_counts_json: string | null;
+  protected_at: string | null;
 }
 
 export interface ActivityLogRow {

@@ -6,6 +6,8 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import esLocale from "@fullcalendar/core/locales/es";
 import type { EventClickArg } from "@fullcalendar/core";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { SESSIONS_VIEW_DEFAULTS, sessionsViewPreferenceSchema } from "@/schemas/viewPreferences";
 import {
   competenciesRepo,
   fundamentalQuestionsRepo,
@@ -60,7 +62,12 @@ export function SessionsPage() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<StudySessionRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<ViewId>("proxima");
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference(
+    "sessions",
+    sessionsViewPreferenceSchema,
+    SESSIONS_VIEW_DEFAULTS,
+  );
+  const view = viewPrefs.view as ViewId;
   const [reprogramTarget, setReprogramTarget] = useState<string | null>(null);
   const [reprogramDate, setReprogramDate] = useState("");
 
@@ -127,7 +134,7 @@ export function SessionsPage() {
         {VIEWS.map((v) => (
           <button
             key={v.id}
-            onClick={() => setView(v.id)}
+            onClick={() => updateViewPrefs({ view: v.id }, { immediate: true })}
             className={`rounded-t px-3 py-2 text-xs uppercase tracking-wide ${
               view === v.id ? "border-b-2 border-accent text-accent" : "text-text-secondary hover:text-text-primary"
             }`}

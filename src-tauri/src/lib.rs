@@ -102,6 +102,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/0013_resource_reading_state_en_proceso.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 14,
+            description: "backup_record_manual_and_verification",
+            sql: include_str!("../../migrations/0014_backup_record_manual_and_verification.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

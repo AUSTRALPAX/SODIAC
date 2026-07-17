@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { CAREER_VIEW_DEFAULTS, careerViewPreferenceSchema } from "@/schemas/viewPreferences";
 import { listAllTasks } from "@/services/tasks";
 import type { TaskRow } from "@/database/types";
 import type { CareerData } from "./useCareerData";
-
-type RangeMode = "semana" | "mes" | "todo";
 
 interface DayEntry {
   id: string;
@@ -32,7 +32,16 @@ function startOfWeek(d: Date): Date {
  * se haya cargado.
  */
 export function CronogramaView({ data }: { data: CareerData }) {
-  const [range, setRange] = useState<RangeMode>("semana");
+  // Clave propia ("career-cronograma", no "career") para no compartir el
+  // mismo blob de preferencias que CareerPage — evita que el flush al
+  // desmontar esta vista pise el campo `view` que CareerPage guardó
+  // mientras tanto.
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference(
+    "career-cronograma",
+    careerViewPreferenceSchema,
+    CAREER_VIEW_DEFAULTS,
+  );
+  const range = viewPrefs.cronogramaRange;
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const today = useMemo(() => new Date(), []);
 
@@ -105,7 +114,7 @@ export function CronogramaView({ data }: { data: CareerData }) {
         {(["semana", "mes", "todo"] as const).map((mode) => (
           <button
             key={mode}
-            onClick={() => setRange(mode)}
+            onClick={() => updateViewPrefs({ cronogramaRange: mode }, { immediate: true })}
             className={`rounded px-3 py-1 text-xs uppercase tracking-wide ${
               range === mode ? "bg-surface-elevated text-accent" : "text-text-secondary hover:text-text-primary"
             }`}

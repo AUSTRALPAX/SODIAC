@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
 import { PdfViewer } from "@/components/documents/PdfViewer";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { DOCUMENTS_VIEW_DEFAULTS, documentsViewPreferenceSchema } from "@/schemas/viewPreferences";
 import type { DocumentVersionRow, InstitutionalDocumentRow } from "@/database/types";
 import {
   attachFileToCurrentVersion,
@@ -45,9 +47,20 @@ const STATUS_OPTIONS: InstitutionalDocumentRow["status"][] = [
 
 export function DocumentsPage() {
   const [documents, setDocuments] = useState<DocumentWithVersion[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { value: viewPrefs, update: updateViewPrefs, loaded: prefsLoaded } = useViewPreference(
+    "documents",
+    documentsViewPreferenceSchema,
+    DOCUMENTS_VIEW_DEFAULTS,
+  );
+  const [selectedId, setSelectedIdState] = useState<string | null>(null);
+  const [initializedSelection, setInitializedSelection] = useState(false);
   const [versions, setVersions] = useState<DocumentVersionRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  function setSelectedId(id: string | null) {
+    setSelectedIdState(id);
+    updateViewPrefs({ selectedId: id }, { immediate: true });
+  }
 
   const refresh = useCallback(async () => {
     const rows = await listDocuments();
@@ -57,10 +70,22 @@ export function DocumentsPage() {
   }, []);
 
   useEffect(() => {
-    void refresh().then((rows) => {
-      if (rows.length > 0) setSelectedId(rows[0]!.id);
-    });
+    void refresh();
   }, [refresh]);
+
+  // Igual criterio que Proyectos: restaura la selección persistida si sigue
+  // existiendo, si no cae al primer documento.
+  useEffect(() => {
+    if (initializedSelection || !prefsLoaded || documents.length === 0) return;
+    const persisted = viewPrefs.selectedId;
+    if (persisted && documents.some((d) => d.id === persisted)) {
+      setSelectedIdState(persisted);
+    } else {
+      setSelectedId(documents[0]!.id);
+    }
+    setInitializedSelection(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initializedSelection, prefsLoaded, documents, viewPrefs.selectedId]);
 
   const refreshVersions = useCallback(async (documentId: string) => {
     setVersions(await listVersions(documentId));

@@ -3,9 +3,11 @@ import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import { recordErrorSafely } from "@/services/errorLog";
 import { initCloseGuard } from "@/services/closeGuard";
+import { runStartupBackupCheck } from "@/services/backup/scheduler";
 import "../styles/index.css";
 
 initCloseGuard();
+void runStartupBackupCheck();
 
 window.addEventListener("error", (event) => {
   console.error("[SODIAC] Error global no controlado:", event.error ?? event.message);

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { OBSIDIAN_VIEW_DEFAULTS, obsidianViewPreferenceSchema } from "@/schemas/viewPreferences";
 import {
   createNoteFromTemplate,
   getPermissionMode,
@@ -73,7 +75,12 @@ export function ObsidianPage() {
   const [vaultPath, setVaultPathState] = useState<string | null>(null);
   const [permissionMode, setPermissionModeState] = useState<ObsidianPermissionMode>("solo_lectura");
   const [notes, setNotes] = useState<ObsidianNoteRow[]>([]);
-  const [search, setSearch] = useState("");
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference(
+    "obsidian",
+    obsidianViewPreferenceSchema,
+    OBSIDIAN_VIEW_DEFAULTS,
+  );
+  const { search } = viewPrefs;
   const [indexing, setIndexing] = useState(false);
   const [summary, setSummary] = useState<IndexSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -920,7 +927,7 @@ export function ObsidianPage() {
             </h2>
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => updateViewPrefs({ search: e.target.value })}
               placeholder="Buscar…"
               className="rounded border border-border bg-background px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
             />

@@ -4,7 +4,13 @@ import { userSettingsRepo } from "@/database/entities";
 export async function getSetting<T>(key: string): Promise<T | null> {
   const rows = await userSettingsRepo.list({ where: "key = ?", params: [key] });
   if (rows.length === 0) return null;
-  return JSON.parse(rows[0]!.value_json) as T;
+  try {
+    return JSON.parse(rows[0]!.value_json) as T;
+  } catch {
+    // Un value_json corrupto nunca debe romper al llamador — se trata igual
+    // que una preferencia ausente.
+    return null;
+  }
 }
 
 export async function setSetting<T>(key: string, value: T): Promise<void> {

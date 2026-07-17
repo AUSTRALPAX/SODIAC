@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { curriculumUnitsRepo, subjectsRepo, topicsRepo } from "@/database/entities";
 import type { BibliographicSourceRow, CurriculumUnitRow, ObsidianNoteRow, ProjectRow, ResourceRow, SubjectRow, TopicRow } from "@/database/types";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { LIBRARY_VIEW_DEFAULTS, libraryViewPreferenceSchema } from "@/schemas/viewPreferences";
 import {
   createBibliographicNoteForResource,
   createResource,
@@ -118,7 +120,6 @@ const FUNCTION_LABEL: Record<NonNullable<ResourceRow["function_note"]>, string> 
 };
 
 type SortKey = "titulo" | "area" | "autor" | "reciente" | "estado";
-type SortDirection = "asc" | "desc";
 
 export function LibraryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -132,18 +133,25 @@ export function LibraryPage() {
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("");
-  const [stateFilter, setStateFilter] = useState<string>("");
-  const [areaFilter, setAreaFilter] = useState<string>("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [functionFilter, setFunctionFilter] = useState<string>("");
-  const [availabilityFilter, setAvailabilityFilter] = useState<"" | "disponible" | "sin_archivo">("");
-  const [subjectFilter, setSubjectFilter] = useState<string>("");
-  const [topicFilter, setTopicFilter] = useState<string>("");
-  const [sortKey, setSortKey] = useState<SortKey>("area");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [showMinimalPathOnly, setShowMinimalPathOnly] = useState(false);
+  const { value: viewPrefs, update: updateViewPrefs, reset: resetViewPrefs } = useViewPreference(
+    "library",
+    libraryViewPreferenceSchema,
+    LIBRARY_VIEW_DEFAULTS,
+  );
+  const {
+    typeFilter,
+    stateFilter,
+    areaFilter,
+    categoryFilter,
+    functionFilter,
+    availabilityFilter,
+    subjectFilter,
+    topicFilter,
+    sortKey,
+    sortDirection,
+    expandedId,
+    showMinimalPathOnly,
+  } = viewPrefs;
 
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
@@ -206,7 +214,7 @@ export function LibraryPage() {
   useEffect(() => {
     const tema = searchParams.get("tema");
     if (tema) {
-      setTopicFilter(tema);
+      updateViewPrefs({ topicFilter: tema }, { immediate: true });
       setSearchParams({}, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -569,7 +577,7 @@ export function LibraryPage() {
         />
         <select
           value={areaFilter}
-          onChange={(e) => setAreaFilter(e.target.value)}
+          onChange={(e) => updateViewPrefs({ areaFilter: e.target.value }, { immediate: true })}
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="">Todas las áreas</option>
@@ -581,7 +589,7 @@ export function LibraryPage() {
         </select>
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => updateViewPrefs({ typeFilter: e.target.value }, { immediate: true })}
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="">Todos los tipos</option>
@@ -593,7 +601,7 @@ export function LibraryPage() {
         </select>
         <select
           value={functionFilter}
-          onChange={(e) => setFunctionFilter(e.target.value)}
+          onChange={(e) => updateViewPrefs({ functionFilter: e.target.value }, { immediate: true })}
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="">Toda función</option>
@@ -605,7 +613,7 @@ export function LibraryPage() {
         </select>
         <select
           value={stateFilter}
-          onChange={(e) => setStateFilter(e.target.value)}
+          onChange={(e) => updateViewPrefs({ stateFilter: e.target.value }, { immediate: true })}
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="">Todos los estados</option>
@@ -617,7 +625,12 @@ export function LibraryPage() {
         </select>
         <select
           value={availabilityFilter}
-          onChange={(e) => setAvailabilityFilter(e.target.value as typeof availabilityFilter)}
+          onChange={(e) =>
+            updateViewPrefs(
+              { availabilityFilter: e.target.value as typeof availabilityFilter },
+              { immediate: true },
+            )
+          }
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="">Toda disponibilidad</option>
@@ -626,7 +639,7 @@ export function LibraryPage() {
         </select>
         <select
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
+          onChange={(e) => updateViewPrefs({ categoryFilter: e.target.value }, { immediate: true })}
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="">Toda categoría de catálogo</option>
@@ -638,7 +651,7 @@ export function LibraryPage() {
         </select>
         <select
           value={subjectFilter}
-          onChange={(e) => setSubjectFilter(e.target.value)}
+          onChange={(e) => updateViewPrefs({ subjectFilter: e.target.value }, { immediate: true })}
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="">Toda materia</option>
@@ -650,7 +663,7 @@ export function LibraryPage() {
         </select>
         <select
           value={topicFilter}
-          onChange={(e) => setTopicFilter(e.target.value)}
+          onChange={(e) => updateViewPrefs({ topicFilter: e.target.value }, { immediate: true })}
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="">Todo tema</option>
@@ -664,13 +677,13 @@ export function LibraryPage() {
           <input
             type="checkbox"
             checked={showMinimalPathOnly}
-            onChange={(e) => setShowMinimalPathOnly(e.target.checked)}
+            onChange={(e) => updateViewPrefs({ showMinimalPathOnly: e.target.checked }, { immediate: true })}
           />
           Solo ruta mínima austrofinanciera
         </label>
         <select
           value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as SortKey)}
+          onChange={(e) => updateViewPrefs({ sortKey: e.target.value as SortKey }, { immediate: true })}
           className="rounded border border-border bg-background px-2 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none"
         >
           <option value="area">Ordenar por área</option>
@@ -680,11 +693,18 @@ export function LibraryPage() {
           <option value="estado">Ordenar por estado de lectura</option>
         </select>
         <button
-          onClick={() => setSortDirection((d) => (d === "asc" ? "desc" : "asc"))}
+          onClick={() => updateViewPrefs({ sortDirection: sortDirection === "asc" ? "desc" : "asc" }, { immediate: true })}
           title={sortDirection === "asc" ? "Ascendente" : "Descendente"}
           className="rounded border border-border px-2 py-1.5 text-sm text-text-secondary hover:border-accent hover:text-accent"
         >
           {sortDirection === "asc" ? "↑ Ascendente" : "↓ Descendente"}
+        </button>
+        <button
+          onClick={() => void resetViewPrefs()}
+          title="Restablecer esta vista"
+          className="rounded border border-border px-2 py-1.5 text-xs text-text-muted hover:border-accent hover:text-accent"
+        >
+          Restablecer vista
         </button>
         <span className="self-center text-xs text-text-muted">{filtered.length} recursos</span>
       </div>
@@ -697,7 +717,10 @@ export function LibraryPage() {
           return (
             <li key={r.id} className="p-3 text-sm">
               <div className="flex items-start justify-between gap-3">
-                <button className="min-w-0 flex-1 text-left" onClick={() => setExpandedId(expanded ? null : r.id)}>
+                <button
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => updateViewPrefs({ expandedId: expanded ? null : r.id }, { immediate: true })}
+                >
                   <p className="text-text-primary">{r.title}</p>
                   <p className="mt-0.5 text-xs text-text-muted">
                     {r.area && `${r.area} · `}

@@ -1,14 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { exists, stat } from "@tauri-apps/plugin-fs";
+import { exists, stat, writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
+import { save, open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
-  type BackupType,
+  exportViewPreferences,
+  importViewPreferences,
+  resetAllViewPreferences,
+  type ViewPreferencesExport,
+} from "@/services/viewPreferences";
+import {
   checkIntegrity,
+  compareBackupToCurrent,
   createBackup,
   listBackups,
+  protectBackup,
   restoreBackup,
+  runDataProtectionDiagnostic,
+  unprotectBackup,
+  type BackupType,
+  type DataProtectionCheck,
+  type RestoreComparisonRow,
 } from "@/services/backup";
+import { DiagnosticItem } from "@/components/DiagnosticItem";
 import { exportAllAsJson, exportEntityAsCsv, EXPORTABLE_TABLES } from "@/services/export";
 import { importInstitutionalSeed, type SeedImportSummary } from "@/services/seedImport";
 import { getVaultPath, listIndexedNotes } from "@/services/obsidian";
@@ -43,6 +57,10 @@ export function SettingsPage() {
   const [backups, setBackups] = useState<BackupRecordRow[]>([]);
   const [backupBusy, setBackupBusy] = useState<string | null>(null);
   const [integrityResult, setIntegrityResult] = useState<string | null>(null);
+  const [viewPrefsBusy, setViewPrefsBusy] = useState(false);
+  const [viewPrefsMessage, setViewPrefsMessage] = useState<string | null>(null);
+  const [protectionChecks, setProtectionChecks] = useState<DataProtectionCheck[] | null>(null);
+  const [protectionBusy, setProtectionBusy] = useState(false);
 
   const [seedBusy, setSeedBusy] = useState(false);
   const [seedResult, setSeedResult] = useState<SeedImportSummary | null>(null);
@@ -92,8 +110,13 @@ export function SettingsPage() {
   }
 
   async function handleRestore(backup: BackupRecordRow) {
+    const comparison = await compareBackupToCurrent(backup.id);
+    const comparisonText = comparison
+      .map((r: RestoreComparisonRow) => `${r.table}: actual ${r.currentCount} → backup ${r.backupCount}`)
+      .join("\n");
     const confirmed = window.confirm(
-      `Vas a restaurar el backup del ${formatDate(backup.created_at)} (${backup.backup_type}, ${formatBytes(backup.size_bytes)}). ` +
+      `Vas a restaurar el backup del ${formatDate(backup.created_at)} (${backup.backup_type}, ${formatBytes(backup.size_bytes)}, estado: ${backup.status ?? "sin verificar"}).\n\n` +
+        `Comparación de tablas críticas:\n${comparisonText}\n\n` +
         "Esto reemplaza la base de datos actual (se crea un backup de seguridad antes de reemplazarla). ¿Continuar?",
     );
     if (!confirmed) return;
@@ -109,9 +132,81 @@ export function SettingsPage() {
     }
   }
 
+  async function handleToggleProtect(backup: BackupRecordRow) {
+    setBackupBusy(backup.id);
+    try {
+      if (backup.protected_at) await unprotectBackup(backup.id);
+      else await protectBackup(backup.id);
+      await refreshBackups();
+    } finally {
+      setBackupBusy(null);
+    }
+  }
+
+  async function handleRunProtectionDiagnostic() {
+    setProtectionBusy(true);
+    try {
+      setProtectionChecks(await runDataProtectionDiagnostic());
+    } finally {
+      setProtectionBusy(false);
+    }
+  }
+
   async function handleCheckIntegrity() {
     const result = await checkIntegrity();
     setIntegrityResult(result.ok ? "ok" : `problema detectado: ${result.detail}`);
+  }
+
+  async function handleResetAllViewPreferences() {
+    const confirmed = window.confirm(
+      "Esto restablece el orden, los filtros y los paneles guardados de todas las secciones a sus valores predeterminados. No borra ningún dato académico. ¿Continuar?",
+    );
+    if (!confirmed) return;
+    setViewPrefsBusy(true);
+    setViewPrefsMessage(null);
+    try {
+      await resetAllViewPreferences();
+      setViewPrefsMessage("Preferencias de vista restablecidas. Los cambios se ven al volver a abrir cada sección.");
+    } finally {
+      setViewPrefsBusy(false);
+    }
+  }
+
+  async function handleExportViewPreferences() {
+    setViewPrefsBusy(true);
+    setViewPrefsMessage(null);
+    try {
+      const data = await exportViewPreferences();
+      const path = await save({
+        title: "Exportar preferencias de vista",
+        defaultPath: `sodiac-preferencias-vista-${Date.now()}.json`,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await writeTextFile(path, JSON.stringify(data, null, 2));
+      setViewPrefsMessage("Preferencias exportadas correctamente.");
+    } finally {
+      setViewPrefsBusy(false);
+    }
+  }
+
+  async function handleImportViewPreferences() {
+    setViewPrefsBusy(true);
+    setViewPrefsMessage(null);
+    try {
+      const picked = await openDialog({ multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] });
+      if (!picked || Array.isArray(picked)) return;
+      const raw = await readTextFile(picked);
+      const parsed = JSON.parse(raw) as ViewPreferencesExport;
+      const result = await importViewPreferences(parsed);
+      setViewPrefsMessage(
+        `Importadas ${result.imported} preferencias${result.skipped > 0 ? `, ${result.skipped} ignoradas por formato inválido` : ""}. Los cambios se ven al volver a abrir cada sección.`,
+      );
+    } catch (error) {
+      setViewPrefsMessage(`No se pudo importar: ${String(error)}`);
+    } finally {
+      setViewPrefsBusy(false);
+    }
   }
 
   async function handleImportSeed() {
@@ -216,10 +311,10 @@ export function SettingsPage() {
         <div className="mt-3 flex gap-2">
           <button
             disabled={backupBusy !== null}
-            onClick={() => handleCreateBackup("diario")}
+            onClick={() => handleCreateBackup("manual")}
             className="rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent disabled:opacity-50"
           >
-            {backupBusy === "diario" ? "Creando…" : "Crear backup ahora"}
+            {backupBusy === "manual" ? "Creando…" : "Crear backup ahora"}
           </button>
         </div>
         <ul className="mt-4 divide-y divide-border-subtle rounded border border-border-subtle bg-surface">
@@ -231,22 +326,101 @@ export function SettingsPage() {
               <div>
                 <span className="text-text-primary">{formatDate(b.created_at)}</span>{" "}
                 <span className="text-text-muted">
-                  · {b.backup_type} · {formatBytes(b.size_bytes)}
+                  · {b.backup_type} · {formatBytes(b.size_bytes)} ·{" "}
+                  <span
+                    className={
+                      b.status === "verificado"
+                        ? "text-success"
+                        : b.status == null
+                          ? "text-text-muted"
+                          : "text-danger"
+                    }
+                  >
+                    {b.status ?? "sin verificar"}
+                  </span>
+                  {b.protected_at && <span className="ml-1 text-accent">· protegido</span>}
                 </span>
                 {b.restored_at && (
                   <span className="ml-2 text-xs text-success">restaurado {formatDate(b.restored_at)}</span>
                 )}
               </div>
-              <button
-                disabled={backupBusy !== null}
-                onClick={() => handleRestore(b)}
-                className="shrink-0 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
-              >
-                {backupBusy === b.id ? "Restaurando…" : "Restaurar"}
-              </button>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  disabled={backupBusy !== null}
+                  onClick={() => handleToggleProtect(b)}
+                  className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
+                >
+                  {b.protected_at ? "Desproteger" : "Proteger"}
+                </button>
+                <button
+                  disabled={backupBusy !== null}
+                  onClick={() => handleRestore(b)}
+                  className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
+                >
+                  {backupBusy === b.id ? "Restaurando…" : "Restaurar"}
+                </button>
+              </div>
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          Datos y recuperación
+        </h2>
+        <p className="mt-1 text-xs text-text-muted">
+          Diagnóstico rápido de que la persistencia y los backups están funcionando.
+        </p>
+        <button
+          disabled={protectionBusy}
+          onClick={handleRunProtectionDiagnostic}
+          className="mt-3 rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent disabled:opacity-50"
+        >
+          {protectionBusy ? "Comprobando…" : "Comprobar que mis datos están protegidos"}
+        </button>
+        {protectionChecks && (
+          <div className="mt-3 grid grid-cols-2 gap-3 rounded border border-border-subtle bg-surface p-3 text-xs sm:grid-cols-3">
+            {protectionChecks.map((c) => (
+              <DiagnosticItem key={c.label} label={c.label} value={c.detail} tone={c.ok ? "success" : "danger"} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          Preferencias de vista
+        </h2>
+        <p className="mt-1 text-xs text-text-muted">
+          Orden, filtros y paneles que cada sección recuerda (Biblioteca, Trayectoria, Carrera,
+          Mapa, Sesiones, Repasos, Obsidian, Proyectos, Documentos). Restablecerlas no borra
+          ningún dato académico.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            disabled={viewPrefsBusy}
+            onClick={handleResetAllViewPreferences}
+            className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
+          >
+            Restablecer todas las vistas
+          </button>
+          <button
+            disabled={viewPrefsBusy}
+            onClick={handleExportViewPreferences}
+            className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
+          >
+            Exportar preferencias
+          </button>
+          <button
+            disabled={viewPrefsBusy}
+            onClick={handleImportViewPreferences}
+            className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
+          >
+            Importar preferencias
+          </button>
+        </div>
+        {viewPrefsMessage && <p className="mt-2 text-xs text-text-muted">{viewPrefsMessage}</p>}
       </section>
 
       <section className="mt-10">

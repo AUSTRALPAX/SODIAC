@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import {
+  MASTER_SCHEDULE_VIEW_DEFAULTS,
+  masterScheduleViewPreferenceSchema,
+  type MasterScheduleViewPreference,
+} from "@/schemas/viewPreferences";
 import {
   bibliographicSourcesRepo,
   curriculumDependenciesRepo,
@@ -33,20 +39,28 @@ const STATUS_COLOR: Record<ScheduleStepStatus, string> = {
   bloqueado: "text-danger",
 };
 
-type ViewMode = "linea" | "materias";
 type Density = "compacto" | "detallado";
 
 export function MasterScheduleView({ data, initialSearch }: { data: CareerData; initialSearch?: string }) {
   const navigate = useNavigate();
   const [schedule, setSchedule] = useState<MasterSchedule | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<ViewMode>("linea");
-  const [density, setDensity] = useState<Density>("compacto");
-  const [search, setSearch] = useState(initialSearch ?? "");
-  const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
-  const [collapsedSubjects, setCollapsedSubjects] = useState<Set<string>>(new Set());
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference<MasterScheduleViewPreference>(
+    "career-master-schedule",
+    masterScheduleViewPreferenceSchema,
+    MASTER_SCHEDULE_VIEW_DEFAULTS,
+  );
+  const { view, density, search, expandedTopicId } = viewPrefs;
+  const collapsedSubjects = useMemo(() => new Set(viewPrefs.collapsedSubjectIds), [viewPrefs.collapsedSubjectIds]);
   const [schedulingStep, setSchedulingStep] = useState<ScheduleStep | null>(null);
   const [scheduleDate, setScheduleDate] = useState("");
+
+  // ?buscar= desde "Ver bibliografía" del Mapa/Cronograma — prioriza el
+  // valor que trae la URL sobre la preferencia guardada, y lo persiste.
+  useEffect(() => {
+    if (initialSearch) updateViewPrefs({ search: initialSearch }, { immediate: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSearch]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,12 +150,10 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
   }
 
   function toggleSubjectCollapse(subjectId: string) {
-    setCollapsedSubjects((prev) => {
-      const next = new Set(prev);
-      if (next.has(subjectId)) next.delete(subjectId);
-      else next.add(subjectId);
-      return next;
-    });
+    const next = new Set(collapsedSubjects);
+    if (next.has(subjectId)) next.delete(subjectId);
+    else next.add(subjectId);
+    updateViewPrefs({ collapsedSubjectIds: Array.from(next) }, { immediate: true });
   }
 
   if (loading || !schedule) return <p className="text-sm text-text-muted">Calculando el recorrido…</p>;
@@ -182,7 +194,7 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
           {(["linea", "materias"] as const).map((mode) => (
             <button
               key={mode}
-              onClick={() => setView(mode)}
+              onClick={() => updateViewPrefs({ view: mode }, { immediate: true })}
               className={`rounded px-3 py-1 text-xs uppercase tracking-wide ${
                 view === mode ? "bg-surface-elevated text-accent" : "text-text-secondary hover:text-text-primary"
               }`}
@@ -194,12 +206,12 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
         <div className="flex items-center gap-2">
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => updateViewPrefs({ search: e.target.value })}
             placeholder="Buscar tema o materia…"
             className="rounded border border-border bg-background px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
           />
           <button
-            onClick={() => setDensity((d) => (d === "compacto" ? "detallado" : "compacto"))}
+            onClick={() => updateViewPrefs({ density: density === "compacto" ? "detallado" : "compacto" }, { immediate: true })}
             className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
           >
             {density === "compacto" ? "Ver detallado" : "Ver compacto"}
@@ -221,7 +233,12 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
               step={step}
               density={density}
               expanded={expandedTopicId === step.topic.id}
-              onToggleExpand={() => setExpandedTopicId((id) => (id === step.topic.id ? null : step.topic.id))}
+              onToggleExpand={() =>
+                updateViewPrefs(
+                  { expandedTopicId: expandedTopicId === step.topic.id ? null : step.topic.id },
+                  { immediate: true },
+                )
+              }
               onComplete={() => void handleComplete(step)}
               onStartSession={() => handleStartSession(step)}
               onOpenSubject={() => navigate(`/carrera/${step.subject.id}`)}
@@ -259,7 +276,12 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
                         step={step}
                         density={density}
                         expanded={expandedTopicId === step.topic.id}
-                        onToggleExpand={() => setExpandedTopicId((id) => (id === step.topic.id ? null : step.topic.id))}
+                        onToggleExpand={() =>
+                          updateViewPrefs(
+                            { expandedTopicId: expandedTopicId === step.topic.id ? null : step.topic.id },
+                            { immediate: true },
+                          )
+                        }
                         onComplete={() => void handleComplete(step)}
                         onStartSession={() => handleStartSession(step)}
                         onOpenSubject={() => navigate(`/carrera/${step.subject.id}`)}

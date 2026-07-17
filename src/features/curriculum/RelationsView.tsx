@@ -11,6 +11,8 @@ import ReactFlow, {
   type ReactFlowInstance,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { MAP_VIEW_DEFAULTS, mapViewPreferenceSchema } from "@/schemas/viewPreferences";
 import { layoutHorizontal } from "./mapLayout";
 import { OPTIONAL_RENDERED_TYPES, RENDERED_TYPES, TYPE_COLOR, TYPE_LABEL, type MapEntityType } from "./mapTypeColors";
 import { EntityDetailPanel, type SelectedEntity } from "./EntityDetailPanel";
@@ -163,14 +165,41 @@ function computeCompleteness(data: CurriculumData) {
 
 export function RelationsView({ data }: { data: CurriculumData }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [hiddenTypes, setHiddenTypes] = useState<Set<MapEntityType>>(new Set(["obsidian_note"]));
-  const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
-  const [showNotes, setShowNotes] = useState(false);
-  const [focusSubjectId, setFocusSubjectId] = useState<string | null>(null);
+  // Clave propia ("map-relations") — CurriculumPage ya usa "map" para su
+  // propio selector árbol/tabla/mapa, y compartir la clave arriesgaría que
+  // el flush de una vista pise el campo de la otra al desmontar.
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference(
+    "map-relations",
+    mapViewPreferenceSchema,
+    MAP_VIEW_DEFAULTS,
+  );
+  const hiddenTypes = useMemo(() => new Set(viewPrefs.hiddenTypes) as Set<MapEntityType>, [viewPrefs.hiddenTypes]);
+  const expandedSubjects = useMemo(() => new Set(viewPrefs.expandedSubjectIds), [viewPrefs.expandedSubjectIds]);
+  const { showNotes, focusSubjectId, showLegend, showCompleteness } = viewPrefs;
+  function setHiddenTypes(next: Set<MapEntityType> | ((prev: Set<MapEntityType>) => Set<MapEntityType>)) {
+    const resolved = typeof next === "function" ? next(hiddenTypes) : next;
+    updateViewPrefs({ hiddenTypes: Array.from(resolved) }, { immediate: true });
+  }
+  function setExpandedSubjects(next: Set<string> | ((prev: Set<string>) => Set<string>)) {
+    const resolved = typeof next === "function" ? next(expandedSubjects) : next;
+    updateViewPrefs({ expandedSubjectIds: Array.from(resolved) }, { immediate: true });
+  }
+  function setShowNotes(value: boolean) {
+    updateViewPrefs({ showNotes: value }, { immediate: true });
+  }
+  function setFocusSubjectId(value: string | null) {
+    updateViewPrefs({ focusSubjectId: value }, { immediate: true });
+  }
+  function setShowLegend(next: boolean | ((prev: boolean) => boolean)) {
+    const resolved = typeof next === "function" ? next(showLegend) : next;
+    updateViewPrefs({ showLegend: resolved }, { immediate: true });
+  }
+  function setShowCompleteness(next: boolean | ((prev: boolean) => boolean)) {
+    const resolved = typeof next === "function" ? next(showCompleteness) : next;
+    updateViewPrefs({ showCompleteness: resolved }, { immediate: true });
+  }
   const [search, setSearch] = useState(searchParams.get("buscar") ?? "");
   const [selected, setSelected] = useState<SelectedEntity | null>(null);
-  const [showLegend, setShowLegend] = useState(true);
-  const [showCompleteness, setShowCompleteness] = useState(true);
   const completeness = useMemo(() => computeCompleteness(data), [data]);
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null);
 

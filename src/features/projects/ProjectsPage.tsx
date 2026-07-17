@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { PROJECTS_VIEW_DEFAULTS, projectsViewPreferenceSchema } from "@/schemas/viewPreferences";
 import { projectMilestonesRepo } from "@/database/entities";
 import type { ProjectMilestoneRow, ProjectRow } from "@/database/types";
 import {
@@ -43,9 +45,20 @@ const CONTEXT_COLOR: Record<ProjectRow["context_type"], string> = {
 
 export function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { value: viewPrefs, update: updateViewPrefs, loaded: prefsLoaded } = useViewPreference(
+    "projects",
+    projectsViewPreferenceSchema,
+    PROJECTS_VIEW_DEFAULTS,
+  );
+  const [selectedId, setSelectedIdState] = useState<string | null>(null);
+  const [initializedSelection, setInitializedSelection] = useState(false);
   const [milestones, setMilestones] = useState<ProjectMilestoneRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  function setSelectedId(id: string | null) {
+    setSelectedIdState(id);
+    updateViewPrefs({ selectedId: id }, { immediate: true });
+  }
 
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
@@ -62,10 +75,23 @@ export function ProjectsPage() {
   }, []);
 
   useEffect(() => {
-    void refresh().then((rows) => {
-      if (rows.length > 0) setSelectedId(rows[0]!.id);
-    });
+    void refresh();
   }, [refresh]);
+
+  // Espera a que carguen tanto los proyectos como la preferencia guardada
+  // antes de decidir: si la selección persistida sigue existiendo, se
+  // restaura; si no, se cae al primer proyecto (comportamiento previo).
+  useEffect(() => {
+    if (initializedSelection || !prefsLoaded || projects.length === 0) return;
+    const persisted = viewPrefs.selectedId;
+    if (persisted && projects.some((p) => p.id === persisted)) {
+      setSelectedIdState(persisted);
+    } else {
+      setSelectedId(projects[0]!.id);
+    }
+    setInitializedSelection(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initializedSelection, prefsLoaded, projects, viewPrefs.selectedId]);
 
   useEffect(() => {
     if (!selectedId) {

@@ -1,5 +1,6 @@
-import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { MAP_VIEW_DEFAULTS, mapViewPreferenceSchema } from "@/schemas/viewPreferences";
 import { useCurriculumData } from "./useCurriculumData";
 import { TreeView } from "./TreeView";
 import { TableView } from "./TableView";
@@ -10,10 +11,11 @@ type ViewMode = "arbol" | "tabla" | "mapa";
 export function CurriculumPage() {
   const data = useCurriculumData();
   const [searchParams] = useSearchParams();
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference("map", mapViewPreferenceSchema, MAP_VIEW_DEFAULTS);
   // Si se llega con ?buscar= (por ejemplo desde "Abrir en mapa" del Cronograma
   // Maestro), arrancar directamente en "Mapa de relaciones", que es donde
-  // vive la búsqueda — no en "Árbol".
-  const [view, setView] = useState<ViewMode>(searchParams.get("buscar") ? "mapa" : "arbol");
+  // vive la búsqueda — no en "Árbol", sin importar la vista guardada.
+  const view: ViewMode = searchParams.get("buscar") ? "mapa" : (viewPrefs.view as ViewMode);
 
   return (
     <div className="p-8">
@@ -23,7 +25,7 @@ export function CurriculumPage() {
           {(["arbol", "tabla", "mapa"] as const).map((mode) => (
             <button
               key={mode}
-              onClick={() => setView(mode)}
+              onClick={() => updateViewPrefs({ view: mode }, { immediate: true })}
               className={`rounded px-3 py-1 text-xs uppercase tracking-wide ${
                 view === mode ? "bg-surface-elevated text-accent" : "text-text-secondary hover:text-text-primary"
               }`}

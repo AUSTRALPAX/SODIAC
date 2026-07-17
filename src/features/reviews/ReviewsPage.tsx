@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useViewPreference } from "@/hooks/useViewPreference";
+import { REVIEWS_VIEW_DEFAULTS, reviewsViewPreferenceSchema } from "@/schemas/viewPreferences";
 import {
   completeReview,
   listReviewQueue,
@@ -39,7 +41,12 @@ export function ReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [postponeTarget, setPostponeTarget] = useState<string | null>(null);
   const [postponeDate, setPostponeDate] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
+  const { value: viewPrefs, update: updateViewPrefs } = useViewPreference(
+    "reviews",
+    reviewsViewPreferenceSchema,
+    REVIEWS_VIEW_DEFAULTS,
+  );
+  const { showHistory } = viewPrefs;
 
   const refresh = useCallback(async () => {
     setReviews(await listReviewQueue());
@@ -105,7 +112,7 @@ export function ReviewsPage() {
           {historial.length > 0 && (
             <div className="mt-8">
               <button
-                onClick={() => setShowHistory((s) => !s)}
+                onClick={() => updateViewPrefs({ showHistory: !showHistory }, { immediate: true })}
                 className="text-xs uppercase tracking-wide text-text-muted hover:text-text-secondary"
               >
                 {showHistory ? "Ocultar" : "Ver"} historial ({historial.length})
