@@ -67,6 +67,8 @@ export interface UpdateRankInput {
   description?: string | null;
   badge?: string | null;
   colorToken?: string | null;
+  minimumLevel?: number;
+  maximumLevel?: number;
 }
 
 /** Editar un rango nunca altera XP — son entidades completamente independientes. */
@@ -77,7 +79,21 @@ export async function updateRank(rankId: string, input: UpdateRankInput): Promis
   if (input.description !== undefined) patch.description = input.description;
   if (input.badge !== undefined) patch.badge = input.badge;
   if (input.colorToken !== undefined) patch.color_token = input.colorToken;
+  if (input.minimumLevel !== undefined) patch.minimum_level = input.minimumLevel;
+  if (input.maximumLevel !== undefined) patch.maximum_level = input.maximumLevel;
   await academicRanksRepo.update(rankId, patch);
+}
+
+/**
+ * Intercambia nombre/subtítulo entre dos rangos, sin tocar sus rangos de
+ * nivel ni su sort_order — así "cambiar de lugar" a dos autores no
+ * desordena el resto de la lista (que sigue viva por nivel).
+ */
+export async function swapRankIdentities(rankIdA: string, rankIdB: string): Promise<void> {
+  const [a, b] = await Promise.all([academicRanksRepo.getById(rankIdA), academicRanksRepo.getById(rankIdB)]);
+  if (!a || !b) throw new Error("No se encontraron ambos rangos para intercambiar.");
+  await academicRanksRepo.update(a.id, { name: b.name, subtitle: b.subtitle, updated_at: now() });
+  await academicRanksRepo.update(b.id, { name: a.name, subtitle: a.subtitle, updated_at: now() });
 }
 
 export async function setRankActive(rankId: string, isActive: boolean): Promise<void> {
