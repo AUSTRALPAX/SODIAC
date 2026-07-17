@@ -72,6 +72,7 @@ export interface ReconciliationSummary {
   topicsCreated: number;
   topicsSkipped: number;
   notesLinked: number;
+  creditsRecalculated: number;
   unresolved: string[];
 }
 
@@ -264,6 +265,7 @@ export async function importCareerFromObsidian(options: ImportCareerOptions = {}
     topicsCreated: 0,
     topicsSkipped: 0,
     notesLinked: 0,
+    creditsRecalculated: 0,
     unresolved: [],
   };
 
@@ -490,7 +492,56 @@ export async function importCareerFromObsidian(options: ImportCareerOptions = {}
     summary.notesLinked++;
   }
 
+  // 6) Créditos proporcionales al contenido real (decisión del usuario: las
+  // materias con más temas otorgan más XP total y son más difíciles de
+  // completar/subir de nivel que las de pocos temas — no todas valen lo
+  // mismo). Cubre TODAS las materias activas (las 9 legacy y las 30 del
+  // vault), no solo las recién creadas en este ciclo, para que quede
+  // corregido de una vez y se mantenga correcto en cada re-sync futuro.
+  summary.creditsRecalculated = await recalculateSubjectCredits();
+
   return summary;
+}
+
+/**
+ * credits ∝ cantidad de temas activos de la materia, normalizado al rango
+ * 1-5 (la columna tiene `CHECK (credits BETWEEN 1 AND 5)` desde la Fase 5 —
+ * no se toca ese constraint). Es la única señal real y no inventada de
+ * "contenido"/"complejidad" disponible hoy: complexity/importance/
+ * estimated_load están en 1 o 3 para todas las materias de un mismo
+ * origen, sin variación real entre ellas (ver docs/MASTER_SCHEDULE_MAP_AUDIT.md,
+ * auditoría O0). Normalización min-max: la materia con menos temas activos
+ * queda en 1, la de más temas en 5, el resto interpolado — así una materia
+ * de 3 temas y otra de 20 no valen lo mismo, y dentro de las 30 materias del
+ * vault (12-20 temas) también hay variación en vez de un crédito plano.
+ * No toca `budgeted_xp`/`completion_budgeted_xp` (se recalculan solos, en
+ * vivo, la próxima vez que se previsualice/otorgue XP — ver
+ * computeSubjectBudgetShare en xp.ts) ni ninguna otra columna.
+ */
+export async function recalculateSubjectCredits(): Promise<number> {
+  const [subjects, topics] = await Promise.all([
+    subjectsRepo.list({ where: "archived_at IS NULL" }),
+    topicsRepo.list({ where: "archived_at IS NULL" }),
+  ]);
+  const topicCountBySubject = new Map<string, number>();
+  for (const t of topics) {
+    topicCountBySubject.set(t.subject_id, (topicCountBySubject.get(t.subject_id) ?? 0) + 1);
+  }
+  const counts = subjects.map((s) => topicCountBySubject.get(s.id) ?? 0);
+  const min = counts.length > 0 ? Math.min(...counts) : 0;
+  const max = counts.length > 0 ? Math.max(...counts) : 0;
+
+  let changed = 0;
+  for (const s of subjects) {
+    const count = topicCountBySubject.get(s.id) ?? 0;
+    const newCredits =
+      max === min ? 3 : Math.min(5, Math.max(1, 1 + Math.round((4 * (count - min)) / (max - min))));
+    if (s.credits !== newCredits) {
+      await subjectsRepo.update(s.id, { credits: newCredits }, "sistema");
+      changed++;
+    }
+  }
+  return changed;
 }
 
 export interface SequentialDependencyResult {

@@ -13,7 +13,7 @@ const NODE_HEIGHT = 40;
 export function layoutHorizontal(nodes: Node[], edges: Edge[]): Node[] {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({ rankdir: "LR", nodesep: 20, ranksep: 110 });
+  graph.setGraph({ rankdir: "LR", nodesep: 32, ranksep: 130 });
 
   for (const node of nodes) {
     graph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });

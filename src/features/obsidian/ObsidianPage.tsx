@@ -638,7 +638,9 @@ export function ObsidianPage() {
                 {reconciliationSummary.competenciesSkipped} ya existían) · {reconciliationSummary.subjectsCreated}{" "}
                 materias creadas ({reconciliationSummary.subjectsSkipped} ya existían) ·{" "}
                 {reconciliationSummary.topicsCreated} temas creados ({reconciliationSummary.topicsSkipped} ya
-                existían) · {reconciliationSummary.notesLinked} notas de Obsidian vinculadas por sodiac_id.
+                existían) · {reconciliationSummary.notesLinked} notas de Obsidian vinculadas por sodiac_id ·{" "}
+                {reconciliationSummary.creditsRecalculated} materias con créditos recalculados según su cantidad de
+                temas.
               </p>
               {reconciliationSummary.unresolved.length > 0 && (
                 <div className="mt-2">

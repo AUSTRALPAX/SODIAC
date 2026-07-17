@@ -31,9 +31,40 @@ function nodeStyle(type: MapEntityType, dimmed: boolean, highlighted: boolean): 
     fontSize: 12,
     padding: "6px 10px",
     width: 240,
+    // Fuerza una sola línea: mapLayout.ts le declara a dagre una altura fija
+    // (NODE_HEIGHT) para calcular el espaciado vertical entre nodos del mismo
+    // rango — si el título envolvía a una segunda línea, la altura real
+    // renderizada superaba esa estimación y el nodo se solapaba con el de
+    // abajo. El título completo sigue disponible al hacer clic (panel de
+    // detalle).
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
     opacity: dimmed ? 0.25 : 1,
     boxShadow: highlighted ? `0 0 0 2px ${color}` : "none",
   };
+}
+
+/**
+ * Recorta el dataset a una sola materia y lo que cuelga de ella (su
+ * pregunta fundamental primaria, sus temas/unidades, y las competencias
+ * referenciadas por esos temas) — usado por el filtro "Enfocar una
+ * materia" para dar una vista chica y navegable en vez del grafo completo.
+ * No es un cálculo de conectividad genérico: sigue exactamente las mismas
+ * relaciones jerárquicas que ya dibuja buildGraph, para no dejar huérfanos
+ * ni traer de más (p. ej. otras materias que comparten la misma pregunta).
+ */
+function filterDataForFocus(data: CurriculumData, focusSubjectId: string | null): CurriculumData {
+  if (!focusSubjectId) return data;
+  const subject = data.subjects.find((s) => s.id === focusSubjectId);
+  if (!subject) return data;
+  const topics = data.topics.filter((t) => t.subject_id === focusSubjectId);
+  const units = data.units.filter((u) => u.subject_id === focusSubjectId);
+  const competencyIds = new Set(topics.map((t) => t.competency_id).filter((id): id is string => !!id));
+  const competencies = data.competencies.filter((c) => competencyIds.has(c.id));
+  const questions = data.questions.filter((q) => q.id === subject.fundamental_question_id);
+  const projects = data.projects.filter((p) => p.subject_id === focusSubjectId);
+  return { ...data, questions, competencies, subjects: [subject], units, topics, projects };
 }
 
 function buildGraph(
@@ -135,6 +166,7 @@ export function RelationsView({ data }: { data: CurriculumData }) {
   const [hiddenTypes, setHiddenTypes] = useState<Set<MapEntityType>>(new Set(["obsidian_note"]));
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
   const [showNotes, setShowNotes] = useState(false);
+  const [focusSubjectId, setFocusSubjectId] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParams.get("buscar") ?? "");
   const [selected, setSelected] = useState<SelectedEntity | null>(null);
   const [showLegend, setShowLegend] = useState(true);
@@ -177,9 +209,16 @@ export function RelationsView({ data }: { data: CurriculumData }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const focusedData = useMemo(() => filterDataForFocus(data, focusSubjectId), [data, focusSubjectId]);
+  // En foco, la materia siempre se muestra expandida (para eso es el foco) sin
+  // depender del estado general de expandedSubjects.
+  const effectiveExpanded = useMemo(
+    () => (focusSubjectId ? new Set([focusSubjectId]) : expandedSubjects),
+    [focusSubjectId, expandedSubjects],
+  );
   const { nodes: rawNodes, edges: rawEdges } = useMemo(
-    () => buildGraph(data, hiddenTypes, expandedSubjects, showNotes),
-    [data, hiddenTypes, expandedSubjects, showNotes],
+    () => buildGraph(focusedData, hiddenTypes, effectiveExpanded, showNotes),
+    [focusedData, hiddenTypes, effectiveExpanded, showNotes],
   );
   const positioned = useMemo(() => layoutHorizontal(rawNodes, rawEdges), [rawNodes, rawEdges]);
 
@@ -188,13 +227,23 @@ export function RelationsView({ data }: { data: CurriculumData }) {
     [fullMatches, searchLower],
   );
 
+  // Reencuadra la vista cada vez que cambia el conjunto de nodos visibles:
+  // con una búsqueda activa, sobre los resultados; si no, sobre todo el
+  // grafo actual (expandir/contraer materias, entrar o salir del foco de una
+  // materia). Sin esto, cambiar de foco dejaba la cámara en la posición del
+  // grafo anterior y los nodos nuevos quedaban fuera de la vista.
   useEffect(() => {
-    if (!matchingIds || matchingIds.size === 0 || !rfInstanceRef.current) return;
-    const visibleMatches = positioned.filter((n) => matchingIds.has(n.id));
-    if (visibleMatches.length === 0) return;
+    if (!rfInstanceRef.current) return;
     const timeout = setTimeout(() => {
-      rfInstanceRef.current?.fitView({ nodes: visibleMatches, duration: 400, padding: 0.3 });
-    }, 60); // esperar al próximo layout tras expandir materias
+      if (matchingIds && matchingIds.size > 0) {
+        const visibleMatches = positioned.filter((n) => matchingIds.has(n.id));
+        if (visibleMatches.length > 0) {
+          rfInstanceRef.current?.fitView({ nodes: visibleMatches, duration: 400, padding: 0.3 });
+          return;
+        }
+      }
+      rfInstanceRef.current?.fitView({ duration: 400, padding: 0.2 });
+    }, 60); // esperar al próximo layout tras expandir materias / cambiar de foco
     return () => clearTimeout(timeout);
   }, [matchingIds, positioned]);
 
@@ -262,8 +311,11 @@ export function RelationsView({ data }: { data: CurriculumData }) {
       );
       if (!confirmed) return;
     }
+    setFocusSubjectId(null);
     setExpandedSubjects(new Set(data.subjects.map((s) => s.id)));
   }
+
+  const sortedSubjects = useMemo(() => [...data.subjects].sort((a, b) => a.title.localeCompare(b.title)), [data.subjects]);
 
   return (
     <div className="relative h-[70vh] rounded border border-border-subtle bg-surface">
@@ -271,6 +323,13 @@ export function RelationsView({ data }: { data: CurriculumData }) {
         nodes={nodes}
         edges={edges}
         fitView
+        // El mínimo de zoom por defecto de reactflow (0.5) no alcanza para
+        // encuadrar los ~549 nodos de "Mostrar todos los temas": fitView
+        // quedaba pegado a ese piso y solo mostraba una esquina del grafo en
+        // vez de la vista general que el usuario esperaba. Bajarlo permite
+        // ver el grafo completo alejado (para orientarse) y volver a
+        // acercarse con scroll/Controls para leer un nodo puntual.
+        minZoom={0.05}
         proOptions={{ hideAttribution: true }}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
@@ -285,8 +344,12 @@ export function RelationsView({ data }: { data: CurriculumData }) {
           pannable
           zoomable
           nodeColor={(n) => TYPE_COLOR[(n.data as NodeData).entityType]}
-          maskColor="rgba(9,11,13,0.7)"
-          style={{ background: "#111418" }}
+          nodeStrokeColor={(n) => TYPE_COLOR[(n.data as NodeData).entityType]}
+          nodeStrokeWidth={3}
+          nodeBorderRadius={4}
+          maskColor="rgba(9,11,13,0.75)"
+          style={{ background: "#111418", border: "1px solid #293037" }}
+          className="!h-48 !w-64"
         />
 
         <Panel position="top-left">
@@ -305,12 +368,50 @@ export function RelationsView({ data }: { data: CurriculumData }) {
                 {fullMatches.length === 0 ? "Sin resultados" : `${fullMatches.length} resultado(s)`}
               </p>
             )}
-            <button
-              onClick={() => setShowLegend((s) => !s)}
-              className="text-xs uppercase tracking-wide text-text-secondary hover:text-accent"
-            >
-              {showLegend ? "Ocultar leyenda" : "Mostrar leyenda"}
-            </button>
+
+            <div className="space-y-1 border-t border-border-subtle pt-2">
+              <label className="block text-[11px] uppercase tracking-wide text-text-secondary">Enfocar una materia</label>
+              <select
+                value={focusSubjectId ?? ""}
+                onChange={(e) => setFocusSubjectId(e.target.value || null)}
+                className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-text-primary focus:border-accent focus:outline-none"
+              >
+                <option value="">Todas las materias ({data.subjects.length})</option>
+                {sortedSubjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+              {focusSubjectId && (
+                <p className="text-[10px] text-text-muted">
+                  Viendo solo esta materia y lo que cuelga de ella. Los botones de abajo dejan de aplicar hasta que
+                  quites el foco.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setShowLegend((s) => !s)}
+                className="text-xs uppercase tracking-wide text-text-secondary hover:text-accent"
+              >
+                {showLegend ? "Ocultar filtro por tipo" : "Filtrar por tipo de nodo"}
+              </button>
+              {showLegend && (
+                <div className="flex gap-2 text-[10px] text-text-muted">
+                  <button onClick={() => setHiddenTypes(new Set())} className="hover:text-accent">
+                    Mostrar todo
+                  </button>
+                  <button
+                    onClick={() => setHiddenTypes(new Set([...RENDERED_TYPES, ...OPTIONAL_RENDERED_TYPES]))}
+                    className="hover:text-accent"
+                  >
+                    Ocultar todo
+                  </button>
+                </div>
+              )}
+            </div>
             {showLegend && (
               <ul className="space-y-1">
                 {[...RENDERED_TYPES, ...OPTIONAL_RENDERED_TYPES].map((type) => (
@@ -336,7 +437,10 @@ export function RelationsView({ data }: { data: CurriculumData }) {
                 Mostrar todos los temas
               </button>
               <button
-                onClick={() => setExpandedSubjects(new Set())}
+                onClick={() => {
+                  setFocusSubjectId(null);
+                  setExpandedSubjects(new Set());
+                }}
                 className="block w-full rounded border border-border px-2 py-1 text-left text-[11px] uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent"
               >
                 Contraer todas las materias

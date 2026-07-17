@@ -90,8 +90,11 @@ export function AcademicSettingsTab({ onChanged }: { onChanged: () => void }) {
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Créditos por materia</h3>
         <p className="mt-1 text-xs text-text-muted">
-          Escala 1 (corta/complementaria) a 5 (troncal/integradora). Define el peso de cada materia al repartir los
-          100.000 XP de la carrera entre todas las materias activas.
+          Escala 1 (menos contenido) a 5 (más contenido). Define el peso de cada materia al repartir los 100.000 XP
+          de la carrera entre todas las materias activas. Por defecto se calculan solos, proporcionales a la
+          cantidad de temas de cada materia respecto de las demás (más temas → más crédito → más XP en juego y más
+          difícil de subir de nivel), y se recalculan automáticamente cada vez que reconciliás con Obsidian. Podés
+          sobrescribir cualquiera a mano acá; ese valor manual se respeta hasta la próxima reconciliación.
         </p>
         <ul className="mt-2 divide-y divide-border-subtle rounded border border-border-subtle bg-surface">
           {subjects.map((s) => (

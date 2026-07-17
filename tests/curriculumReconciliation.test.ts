@@ -84,6 +84,7 @@ const {
   computeAcademicIntegrityAudit,
   listReconciliationCandidates,
   clearBrokenTopicCompetencyRefs,
+  recalculateSubjectCredits,
 } = await import("@/services/curriculumReconciliation");
 
 function baseRow() {
@@ -227,6 +228,102 @@ describe("importCareerFromObsidian (Fase J) — reconciliación con datos sinté
     expect(summary.subjectsCreated).toBe(0);
     expect(summary.unresolved.some((u) => u.includes("MAT-99"))).toBe(true);
     expect(subjects.rows).toHaveLength(0);
+  });
+});
+
+describe("recalculateSubjectCredits — créditos proporcionales a la cantidad de temas", () => {
+  function subjectRow(overrides: Partial<SubjectRow> & { id: string }): SubjectRow {
+    return {
+      fundamental_question_id: "q1",
+      title: overrides.id,
+      description: null,
+      ...baseRow(),
+      credits: 3,
+      complexity: 1,
+      importance: 1,
+      estimated_load: 1,
+      is_mandatory: 1,
+      budgeted_xp: null,
+      completed_at: null,
+      completion_budgeted_xp: null,
+      learning_stage_id: null,
+      career_id: null,
+      external_ref: null,
+      ...overrides,
+    };
+  }
+
+  function topicRow(overrides: Partial<TopicRow> & { id: string; subject_id: string }): TopicRow {
+    return {
+      competency_id: null,
+      learning_stage_id: null,
+      curriculum_unit_id: null,
+      title: overrides.id,
+      description: null,
+      completed_at: null,
+      external_ref: null,
+      ...baseRow(),
+      sort_order: 0,
+      ...overrides,
+    };
+  }
+
+  it("normaliza credits al rango 1-5 según la cantidad de temas (min-max), respetando el CHECK de la columna", async () => {
+    subjects.rows.push(
+      subjectRow({ id: "legacy-corta", credits: 3 }), // 3 temas -> min
+      subjectRow({ id: "legacy-media", credits: 3 }), // 7 temas
+      subjectRow({ id: "real-15", credits: 1 }), // 15 temas
+      subjectRow({ id: "real-max", credits: 1 }), // 20 temas -> max
+      subjectRow({ id: "sin-temas", credits: 3 }),
+    );
+    topics.rows.push(
+      ...Array.from({ length: 3 }, (_, i) => topicRow({ id: `corta-t${i}`, subject_id: "legacy-corta" })),
+      ...Array.from({ length: 7 }, (_, i) => topicRow({ id: `media-t${i}`, subject_id: "legacy-media" })),
+      ...Array.from({ length: 15 }, (_, i) => topicRow({ id: `real15-t${i}`, subject_id: "real-15" })),
+      ...Array.from({ length: 20 }, (_, i) => topicRow({ id: `realmax-t${i}`, subject_id: "real-max" })),
+    );
+
+    const changed = await recalculateSubjectCredits();
+
+    // El mínimo real es "sin-temas" (0 temas) y el máximo es real-max (20 temas).
+    expect(subjects.rows.find((s) => s.id === "sin-temas")!.credits).toBe(1);
+    expect(subjects.rows.find((s) => s.id === "real-max")!.credits).toBe(5);
+    expect(subjects.rows.find((s) => s.id === "legacy-corta")!.credits).toBe(2);
+    // Todas las materias quedan dentro del rango permitido por el CHECK (credits BETWEEN 1 AND 5).
+    for (const s of subjects.rows) {
+      expect(s.credits).toBeGreaterThanOrEqual(1);
+      expect(s.credits).toBeLessThanOrEqual(5);
+    }
+    expect(changed).toBeGreaterThan(0);
+  });
+
+  it("es idempotente: la segunda corrida no reporta cambios", async () => {
+    subjects.rows.push(subjectRow({ id: "s1", credits: 3 }), subjectRow({ id: "s2", credits: 3 }));
+    topics.rows.push(
+      topicRow({ id: "t1", subject_id: "s1" }),
+      topicRow({ id: "t2", subject_id: "s1" }),
+      ...Array.from({ length: 10 }, (_, i) => topicRow({ id: `s2-t${i}`, subject_id: "s2" })),
+    );
+
+    await recalculateSubjectCredits();
+    const second = await recalculateSubjectCredits();
+
+    expect(second).toBe(0);
+  });
+
+  it("cuando todas las materias tienen la misma cantidad de temas, asigna 3 a todas (sin variación inventada)", async () => {
+    subjects.rows.push(subjectRow({ id: "a", credits: 1 }), subjectRow({ id: "b", credits: 5 }));
+    topics.rows.push(
+      topicRow({ id: "a-t1", subject_id: "a" }),
+      topicRow({ id: "a-t2", subject_id: "a" }),
+      topicRow({ id: "b-t1", subject_id: "b" }),
+      topicRow({ id: "b-t2", subject_id: "b" }),
+    );
+
+    await recalculateSubjectCredits();
+
+    expect(subjects.rows.find((s) => s.id === "a")!.credits).toBe(3);
+    expect(subjects.rows.find((s) => s.id === "b")!.credits).toBe(3);
   });
 });
 
