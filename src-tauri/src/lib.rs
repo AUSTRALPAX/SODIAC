@@ -96,6 +96,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/0012_bibliography_austrofinancial.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 13,
+            description: "resource_reading_state_en_proceso",
+            sql: include_str!("../../migrations/0013_resource_reading_state_en_proceso.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

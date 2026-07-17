@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { curriculumUnitsRepo, subjectsRepo, topicsRepo } from "@/database/entities";
 import type { BibliographicSourceRow, CurriculumUnitRow, ObsidianNoteRow, ProjectRow, ResourceRow, SubjectRow, TopicRow } from "@/database/types";
 import {
@@ -16,6 +17,7 @@ import {
   openResource,
   setReadingState,
   unlinkResource,
+  updateResourceAccess,
 } from "@/services/library";
 import { openNoteInObsidian } from "@/services/obsidian";
 import { importLibraryInstitutionalBase, type LibraryImportSummary } from "@/services/libraryImport";
@@ -59,6 +61,7 @@ const RESOURCE_TYPES: ResourceRow["resource_type"][] = [
 const READING_STATES: ResourceRow["reading_state"][] = [
   "pendiente",
   "consultando",
+  "en_proceso",
   "activo",
   "finalizado",
   "referencia",
@@ -69,6 +72,7 @@ const READING_STATES: ResourceRow["reading_state"][] = [
 const READING_STATE_LABEL: Record<ResourceRow["reading_state"], string> = {
   pendiente: "Pendiente",
   consultando: "Consultando",
+  en_proceso: "En proceso",
   activo: "Activo",
   finalizado: "Finalizado",
   referencia: "Referencia",
@@ -78,22 +82,25 @@ const READING_STATE_LABEL: Record<ResourceRow["reading_state"], string> = {
 
 /**
  * Orden de relevancia para "Ordenar por estado" (no alfabético): activo
- * primero (lo que estoy leyendo ahora), después consultando, después
- * pendiente, y al final los estados que ya no son foco de trabajo diario.
+ * primero (lo que estoy leyendo ahora), después consultando y en proceso,
+ * después pendiente, y al final los estados que ya no son foco de trabajo
+ * diario.
  */
 const READING_STATE_RANK: Record<ResourceRow["reading_state"], number> = {
   activo: 0,
   consultando: 1,
-  pendiente: 2,
-  finalizado: 3,
-  referencia: 4,
-  descartado: 5,
-  reemplazado: 6,
+  en_proceso: 2,
+  pendiente: 3,
+  finalizado: 4,
+  referencia: 5,
+  descartado: 6,
+  reemplazado: 7,
 };
 
 const READING_STATE_COLOR: Record<ResourceRow["reading_state"], string> = {
   activo: "text-success",
   consultando: "text-accent",
+  en_proceso: "text-warning",
   pendiente: "text-text-secondary",
   finalizado: "text-text-muted",
   referencia: "text-text-muted",
@@ -155,6 +162,9 @@ export function LibraryPage() {
   const [noteByResource, setNoteByResource] = useState<Map<string, ObsidianNoteRow | null>>(new Map());
   const [creatingNoteFor, setCreatingNoteFor] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
+  const [urlDrafts, setUrlDrafts] = useState<Map<string, string>>(new Map());
+  const [savingUrlFor, setSavingUrlFor] = useState<string | null>(null);
+  const [attachingFileFor, setAttachingFileFor] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const [res, projs, subs, uns, tops] = await Promise.all([
@@ -291,6 +301,30 @@ export function LibraryPage() {
   async function handleUnlink(bibliographicSourceId: string) {
     await unlinkResource(bibliographicSourceId);
     await refresh();
+  }
+
+  async function handleSaveUrl(resourceId: string) {
+    const draft = urlDrafts.get(resourceId) ?? "";
+    setSavingUrlFor(resourceId);
+    try {
+      await updateResourceAccess(resourceId, { url: draft.trim() || null });
+      await refresh();
+    } finally {
+      setSavingUrlFor(null);
+    }
+  }
+
+  async function handleAttachPdf(resourceId: string) {
+    setOpenError(null);
+    const picked = await openDialog({ multiple: false, filters: [{ name: "PDF", extensions: ["pdf"] }] });
+    if (!picked || Array.isArray(picked)) return;
+    setAttachingFileFor(resourceId);
+    try {
+      await updateResourceAccess(resourceId, { filePath: picked });
+      await refresh();
+    } finally {
+      setAttachingFileFor(null);
+    }
   }
 
   async function handleOpenOrCreateNote(resource: ResourceRow) {
@@ -685,7 +719,9 @@ export function LibraryPage() {
                       ? "border-success"
                       : r.reading_state === "consultando"
                         ? "border-accent"
-                        : "border-border"
+                        : r.reading_state === "en_proceso"
+                          ? "border-warning"
+                          : "border-border"
                   } ${READING_STATE_COLOR[r.reading_state]}`}
                 >
                   {READING_STATES.map((s) => (
@@ -724,6 +760,28 @@ export function LibraryPage() {
                         Abrir
                       </button>
                     )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
+                    <input
+                      value={urlDrafts.has(r.id) ? urlDrafts.get(r.id)! : (r.url ?? "")}
+                      onChange={(e) => setUrlDrafts((prev) => new Map(prev).set(r.id, e.target.value))}
+                      placeholder="Pegar URL del recurso…"
+                      className="min-w-[14rem] flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
+                    />
+                    <button
+                      onClick={() => void handleSaveUrl(r.id)}
+                      disabled={savingUrlFor === r.id}
+                      className="shrink-0 rounded border border-accent px-2 py-0.5 text-xs uppercase tracking-wide text-accent hover:bg-accent/10 disabled:opacity-40"
+                    >
+                      {savingUrlFor === r.id ? "Guardando…" : "Guardar URL"}
+                    </button>
+                    <button
+                      onClick={() => void handleAttachPdf(r.id)}
+                      disabled={attachingFileFor === r.id}
+                      className="shrink-0 rounded border border-border px-2 py-0.5 text-xs uppercase tracking-wide text-text-secondary hover:border-accent hover:text-accent disabled:opacity-40"
+                    >
+                      {attachingFileFor === r.id ? "Adjuntando…" : r.file_path ? "Reemplazar PDF" : "Adjuntar PDF"}
+                    </button>
                   </div>
                   <p className="text-text-muted">Consultas registradas: {usageByResource.get(r.id) ?? 0}</p>
 

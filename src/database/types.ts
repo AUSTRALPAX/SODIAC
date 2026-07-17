@@ -374,6 +374,7 @@ export interface ResourceRow extends BaseRow {
   reading_state:
     | "pendiente"
     | "consultando"
+    | "en_proceso"
     | "activo"
     | "finalizado"
     | "referencia"

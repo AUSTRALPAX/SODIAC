@@ -112,6 +112,17 @@ export async function setReadingState(id: string, state: ResourceRow["reading_st
   await resourcesRepo.update(id, { reading_state: state });
 }
 
+/** Actualiza el enlace y/o el archivo local de un recurso desde la ficha expandida de Biblioteca. */
+export async function updateResourceAccess(
+  id: string,
+  patch: { url?: string | null; filePath?: string | null },
+): Promise<void> {
+  const update: Partial<ResourceRow> = { updated_at: now() };
+  if (patch.url !== undefined) update.url = patch.url;
+  if (patch.filePath !== undefined) update.file_path = patch.filePath;
+  await resourcesRepo.update(id, update);
+}
+
 export async function linkResourceToProject(
   resourceId: string,
   projectId: string,
