@@ -1,9 +1,7 @@
 /**
  * Cronograma Maestro (Fase K): el recorrido completo y recomendado de toda
- * la carrera, de principio a fin, sin fechas obligatorias — distinto del
- * "Cronograma" existente en Carrera (src/features/career/CronogramaView.tsx),
- * que es un calendario de actividades/tareas con fecha propia. Acá el orden
- * es curricular (`sequenceOrder`), no temporal.
+ * la carrera, de principio a fin, sin fechas obligatorias. El orden es
+ * curricular (`sequenceOrder`), no temporal.
  *
  * El criterio de orden (sección 4/6 del pedido): las 30 materias reales
  * siguen el orden de las 7 rutas de aprendizaje ya autoradas en el vault

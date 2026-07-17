@@ -5,20 +5,18 @@ import { useCareerData } from "./useCareerData";
 import { RecorridoView } from "./RecorridoView";
 import { MallaView } from "./MallaView";
 import { TemarioView } from "./TemarioView";
-import { CronogramaView } from "./CronogramaView";
 import { MasterScheduleView } from "./MasterScheduleView";
 
-type CareerViewMode = "recorrido" | "malla" | "temario" | "cronograma" | "cronograma-maestro";
+type CareerViewMode = "recorrido" | "malla" | "temario" | "cronograma-maestro";
 
 const VIEW_LABEL: Record<CareerViewMode, string> = {
   recorrido: "Recorrido",
   malla: "Malla curricular",
   temario: "Temario completo",
-  cronograma: "Cronograma",
   "cronograma-maestro": "Cronograma Maestro",
 };
 
-const VALID_VIEWS = new Set<CareerViewMode>(["recorrido", "malla", "temario", "cronograma", "cronograma-maestro"]);
+const VALID_VIEWS = new Set<CareerViewMode>(["recorrido", "malla", "temario", "cronograma-maestro"]);
 
 export function CareerPage() {
   const data = useCareerData();
@@ -43,7 +41,7 @@ export function CareerPage() {
           <p className="mt-1 text-sm text-text-muted">El recorrido completo, ordenado — qué se estudia primero y qué sigue.</p>
         </div>
         <div className="flex gap-1 rounded border border-border-subtle bg-surface p-1">
-          {(["recorrido", "malla", "temario", "cronograma", "cronograma-maestro"] as const).map((mode) => (
+          {(["recorrido", "malla", "temario", "cronograma-maestro"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => updateViewPrefs({ view: mode }, { immediate: true })}
@@ -68,7 +66,6 @@ export function CareerPage() {
           {view === "recorrido" && <RecorridoView data={data} />}
           {view === "malla" && <MallaView data={data} />}
           {view === "temario" && <TemarioView data={data} />}
-          {view === "cronograma" && <CronogramaView data={data} />}
           {view === "cronograma-maestro" &&
             (searchParams.get("buscar") ? (
               <MasterScheduleView data={data} initialSearch={searchParams.get("buscar")!} />
