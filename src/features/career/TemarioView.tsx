@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { completeTopic, previewTopicCompletion } from "@/services/completionXp";
+import { computeTopicLearningState } from "@/services/learningState";
+import { TopicStateBadge } from "@/components/TopicStateBadge";
 import type { TopicRow } from "@/database/types";
 import type { CareerData } from "./useCareerData";
 
@@ -72,7 +74,7 @@ function TopicList({
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="text-text-primary">{topic.title}</span>
               {topic.completed_at ? (
-                <span className="text-xs text-success">Completado</span>
+                <TopicStateBadge state={computeTopicLearningState({ completedAt: topic.completed_at })} />
               ) : (
                 <TopicCompleteControl topic={topic} onReload={onReload} />
               )}

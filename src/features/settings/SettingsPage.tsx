@@ -27,6 +27,7 @@ import { exportAllAsJson, exportEntityAsCsv, EXPORTABLE_TABLES } from "@/service
 import { importInstitutionalSeed, type SeedImportSummary } from "@/services/seedImport";
 import { getVaultPath, listIndexedNotes } from "@/services/obsidian";
 import { enableSafeMode, isSafeModeEnabled } from "@/services/safeMode";
+import { WorkflowGuide } from "./WorkflowGuide";
 import type { BackupRecordRow } from "@/database/types";
 
 /** Debe coincidir con `identifier` en src-tauri/tauri.conf.json — no hay API de Tauri para leerlo en vivo desde el frontend. */
@@ -253,6 +254,8 @@ export function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl p-10">
       <h1 className="font-display text-2xl">Configuración</h1>
+
+      <WorkflowGuide />
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
