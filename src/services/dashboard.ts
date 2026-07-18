@@ -99,6 +99,7 @@ export interface SummaryCounts {
   obsidianNotesIndexed: number;
   activeLibraryResources: number;
   activeSubjects: number;
+  validationsPending: number;
 }
 
 export async function getSummaryCounts(): Promise<SummaryCounts> {
@@ -107,7 +108,7 @@ export async function getSummaryCounts(): Promise<SummaryCounts> {
   const weekStart = startOfWeek(now).toISOString();
   const monthStart = startOfMonth(now).toISOString();
 
-  const [weekRows, monthRows, evidenceRows, reviewRows, projects, notes, resources, subjects] = await Promise.all([
+  const [weekRows, monthRows, evidenceRows, reviewRows, projects, notes, resources, subjects, pendingValidations] = await Promise.all([
     db.select<Array<{ day: string; minutes: number | null }>>(
       `SELECT date(started_at) as day, SUM(actual_duration_min) as minutes FROM study_session
        WHERE started_at IS NOT NULL AND started_at >= ? AND closure_status != 'cancelada'
@@ -128,6 +129,11 @@ export async function getSummaryCounts(): Promise<SummaryCounts> {
     obsidianNotesRepo.list(),
     resourcesRepo.list({ where: "archived_at IS NULL" }),
     subjectsRepo.list({ where: "archived_at IS NULL" }),
+    db.select<Array<{ count: number }>>(
+      `SELECT COUNT(*) as count FROM academic_assignment
+       WHERE work_type = 'validacion_conocimiento' AND archived_at IS NULL
+         AND status IN ('borrador','listo_para_evaluar','evaluacion_pendiente')`,
+    ),
   ]);
 
   const reviewsByState = new Map(reviewRows.map((r) => [r.state, r.count]));
@@ -148,6 +154,7 @@ export async function getSummaryCounts(): Promise<SummaryCounts> {
     obsidianNotesIndexed: notes.length,
     activeLibraryResources: resources.length,
     activeSubjects: subjects.length,
+    validationsPending: pendingValidations[0]?.count ?? 0,
   };
 }
 

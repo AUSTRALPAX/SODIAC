@@ -11,6 +11,10 @@ const CATEGORY_LABEL: Record<string, string> = {
   hitos_dominio: "Hito de dominio",
   revision_diferida_retencion: "Revisión diferida",
   intento: "Intento",
+  finalizacion_tarea_hito: "Tarea o hito completado",
+  finalizacion_tema: "Tema completado (sin validar)",
+  validacion_conocimiento: "Validación de conocimiento aprobada",
+  cierre_materia: "Materia cerrada",
 };
 
 export function ExperienceTab() {

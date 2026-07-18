@@ -351,6 +351,7 @@ function SummarySection({ summary }: { summary: SummaryCounts }) {
         <Tile label="Evidencias producidas" value={summary.evidencesProduced} />
         <Tile label="Repasos realizados" value={summary.reviewsCompleted} />
         <Tile label="Repasos pendientes" value={summary.reviewsPending} />
+        <Tile label="Validaciones pendientes" value={summary.validationsPending} />
         <Tile label="Proyectos activos" value={summary.activeProjects} />
         <Tile label="Notas en Obsidian" value={summary.obsidianNotesIndexed} />
         <Tile label="Recursos bibliográficos" value={summary.activeLibraryResources} />
