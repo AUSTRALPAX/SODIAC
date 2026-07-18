@@ -220,7 +220,11 @@ export async function buildMasterSchedule(input: BuildMasterScheduleInput): Prom
     if (topics.length === 0) continue;
 
     const { completion } = computeSubjectBudgetShare(subject, activeSubjects);
-    const xpPerTopic = (completion * COMPLETION_CATEGORY_WEIGHTS.finalizacion_tema) / topics.length;
+    // XP total potencial del tema — se obtiene completándolo (finalizacion_tema) más
+    // validando el conocimiento (validacion_conocimiento); juntos suman lo mismo que
+    // antes de dividir la categoría en dos.
+    const topicShare = COMPLETION_CATEGORY_WEIGHTS.finalizacion_tema + COMPLETION_CATEGORY_WEIGHTS.validacion_conocimiento;
+    const xpPerTopic = (completion * topicShare) / topics.length;
 
     const etapa = subject.external_ref
       ? (etapaLabel.get(materiaToRuta.get(subject.external_ref) ?? "") ?? "Sin ruta asignada")

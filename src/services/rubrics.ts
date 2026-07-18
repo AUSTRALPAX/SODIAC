@@ -34,6 +34,23 @@ const GENERAL_RUBRIC_CRITERIA: RubricCriterionInput[] = [
 
 export const GENERAL_RUBRIC_TITLE = "Rúbrica general";
 
+/**
+ * Rúbrica de Validación de conocimiento (sección 13 del pedido "Flujo de
+ * trabajo, historial de conocimiento y validación"): pesos exactos pedidos,
+ * distintos de la rúbrica general — por eso es una rúbrica propia y no una
+ * reutilización de GENERAL_RUBRIC_CRITERIA.
+ */
+export const VALIDATION_RUBRIC_TITLE = "Rúbrica — Validación de conocimiento";
+export const VALIDATION_WORK_TYPE = "validacion_conocimiento";
+
+const VALIDATION_RUBRIC_CRITERIA: RubricCriterionInput[] = [
+  { code: "comprension", title: "Comprensión conceptual", weightPoints: 30 },
+  { code: "precision", title: "Precisión", weightPoints: 20 },
+  { code: "relacion", title: "Relación entre ideas", weightPoints: 20 },
+  { code: "aplicacion", title: "Aplicación", weightPoints: 20 },
+  { code: "limites", title: "Reconocimiento de límites", weightPoints: 10 },
+];
+
 async function insertVersionWithCriteria(
   rubricId: string,
   versionLabel: string,
@@ -211,4 +228,33 @@ export async function ensureDefaultRubrics(): Promise<void> {
       await createRubric({ title: spec.title, workType: spec.workType, criteria: spec.criteria });
     }
   }
+
+  const existingValidation = await gradingRubricsRepo.list({ where: "title = ?", params: [VALIDATION_RUBRIC_TITLE] });
+  if (existingValidation.length === 0) {
+    await createRubric({
+      title: VALIDATION_RUBRIC_TITLE,
+      workType: VALIDATION_WORK_TYPE,
+      description: "Evaluación asistida por criterios de si un tema fue realmente comprendido, no solo estudiado.",
+      criteria: VALIDATION_RUBRIC_CRITERIA,
+    });
+  }
+}
+
+/** Rúbrica de validación vigente — la siembra si todavía no existe. */
+export async function getOrCreateValidationRubric(): Promise<RubricWithVersion> {
+  const existing = await gradingRubricsRepo.list({ where: "title = ?", params: [VALIDATION_RUBRIC_TITLE] });
+  if (existing.length === 0) {
+    return createRubric({
+      title: VALIDATION_RUBRIC_TITLE,
+      workType: VALIDATION_WORK_TYPE,
+      description: "Evaluación asistida por criterios de si un tema fue realmente comprendido, no solo estudiado.",
+      criteria: VALIDATION_RUBRIC_CRITERIA,
+    });
+  }
+  const rubric: GradingRubricRow = existing[0]!;
+  const currentVersion = rubric.current_version_id ? await gradingRubricVersionsRepo.getById(rubric.current_version_id) : null;
+  const criteria = currentVersion
+    ? await rubricCriteriaRepo.list({ where: "rubric_version_id = ?", params: [currentVersion.id], orderBy: "sort_order" })
+    : [];
+  return { ...rubric, currentVersion, criteria };
 }

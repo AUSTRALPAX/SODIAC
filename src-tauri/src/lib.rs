@@ -108,6 +108,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/0014_backup_record_manual_and_verification.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 15,
+            description: "validation_xp_category",
+            sql: include_str!("../../migrations/0015_validation_xp_category.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

@@ -23,7 +23,8 @@ const GRADED_CATEGORY_LABEL: Record<string, string> = {
 
 const COMPLETION_CATEGORY_LABEL: Record<string, string> = {
   finalizacion_tarea_hito: "Completar una tarea o hito",
-  finalizacion_tema: "Completar un tema",
+  finalizacion_tema: "Completar un tema (sin validar)",
+  validacion_conocimiento: "Validación de conocimiento aprobada",
   cierre_materia: "Cerrar una materia",
 };
 

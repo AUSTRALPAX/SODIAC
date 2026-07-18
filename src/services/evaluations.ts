@@ -125,6 +125,7 @@ export function categoryForWorkType(workType: string): XpCategory {
     capitulo: "proyecto_examen_integrador",
     protocolo: "ejercicios_practicas",
     trabajo_libre: "ejercicios_practicas",
+    validacion_conocimiento: "validacion_conocimiento",
   };
   return map[workType] ?? "ejercicios_practicas";
 }
@@ -137,6 +138,7 @@ async function insertEvaluationFromResponse(
   calibrationOfId: string | null,
   promptUsed: string | null,
   workHash: string | null,
+  evaluator: AcademicEvaluationRow["evaluator"] = "chatgpt",
 ): Promise<AcademicEvaluationRow> {
   const evaluation: AcademicEvaluationRow = {
     id: crypto.randomUUID(),
@@ -147,7 +149,7 @@ async function insertEvaluationFromResponse(
     verdict: data.verdict,
     confidence: data.confidence,
     evaluator_notes: data.evaluatorNotes || null,
-    evaluator: "chatgpt",
+    evaluator,
     prompt_used: promptUsed,
     work_hash: workHash,
     strengths_json: JSON.stringify(data.strengths),
@@ -203,7 +205,7 @@ export async function importEvaluationResponse(
   assignmentId: string,
   submissionId: string,
   rawText: string,
-  options?: { calibrationOfId?: string; promptUsed?: string },
+  options?: { calibrationOfId?: string; promptUsed?: string; evaluator?: AcademicEvaluationRow["evaluator"] },
 ): Promise<ImportEvaluationResult> {
   const assignment = await academicAssignmentsRepo.getById(assignmentId);
   if (!assignment?.rubric_version_id) throw new Error("El trabajo no tiene una rúbrica asignada.");
@@ -245,6 +247,7 @@ export async function importEvaluationResponse(
     options?.calibrationOfId ?? null,
     options?.promptUsed ?? null,
     submission?.work_hash ?? null,
+    options?.evaluator ?? "chatgpt",
   );
 
   importRecord.resulting_evaluation_id = evaluation.id;

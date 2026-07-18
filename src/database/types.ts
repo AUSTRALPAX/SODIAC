@@ -677,7 +677,11 @@ export interface AcademicTranscriptEntryRow {
   updated_at: string;
 }
 
-export type CompletionXpCategory = "finalizacion_tarea_hito" | "finalizacion_tema" | "cierre_materia";
+export type CompletionXpCategory =
+  | "finalizacion_tarea_hito"
+  | "finalizacion_tema"
+  | "validacion_conocimiento"
+  | "cierre_materia";
 
 export type XpCategory =
   | "notas_conceptuales"

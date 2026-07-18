@@ -35,10 +35,24 @@ export const CATEGORY_WEIGHTS: Record<Exclude<XpCategory, CompletionXpCategory>,
 export const GRADED_SHARE = 0.7;
 export const COMPLETION_SHARE = 0.3;
 
-/** Distribución dentro del presupuesto de finalización de una materia. */
+/**
+ * Distribución dentro del presupuesto de finalización de una materia.
+ *
+ * `finalizacion_tema` representaba el 100% del XP de completar un tema
+ * (0.60 del presupuesto de finalización). Con la validación de conocimiento
+ * (fase 4 del pedido "Flujo de trabajo"), ese 0.60 se reparte: 40% pasa a
+ * `validacion_conocimiento` (otorgado al aceptar una validación aprobada) y
+ * el 60% restante (0.36) queda en `finalizacion_tema` (marcar completado sin
+ * pasar por validación — sesión + nota + repaso combinados, hasta que una
+ * fase futura los separe más). Un tema que hace ambas cosas (completar +
+ * validar) sigue sumando el mismo 0.60 total que antes — no se infla ni se
+ * reduce el presupuesto de la materia, solo se reparte en más eventos.
+ * `finalizacion_tarea_hito`/`cierre_materia` quedan sin cambios.
+ */
 export const COMPLETION_CATEGORY_WEIGHTS: Record<CompletionXpCategory, number> = {
   finalizacion_tarea_hito: 0.20,
-  finalizacion_tema: 0.60,
+  finalizacion_tema: 0.36,
+  validacion_conocimiento: 0.24,
   cierre_materia: 0.20,
 };
 

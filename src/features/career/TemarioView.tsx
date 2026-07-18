@@ -2,6 +2,7 @@ import { useState } from "react";
 import { completeTopic, previewTopicCompletion } from "@/services/completionXp";
 import { computeTopicLearningState } from "@/services/learningState";
 import { TopicStateBadge } from "@/components/TopicStateBadge";
+import { ValidationPanel } from "./ValidationPanel";
 import type { TopicRow } from "@/database/types";
 import type { CareerData } from "./useCareerData";
 
@@ -65,6 +66,8 @@ function TopicList({
   activities: CareerData["activities"];
   onReload: () => void;
 }) {
+  const [validatingTopicId, setValidatingTopicId] = useState<string | null>(null);
+
   return (
     <ul className="divide-y divide-border-subtle border-t border-border-subtle">
       {topics.map((topic) => {
@@ -73,11 +76,19 @@ function TopicList({
           <li key={topic.id} className="px-3 py-2">
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="text-text-primary">{topic.title}</span>
-              {topic.completed_at ? (
-                <TopicStateBadge state={computeTopicLearningState({ completedAt: topic.completed_at })} />
-              ) : (
-                <TopicCompleteControl topic={topic} onReload={onReload} />
-              )}
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => setValidatingTopicId(validatingTopicId === topic.id ? null : topic.id)}
+                  className="rounded border border-border px-2 py-0.5 text-xs text-text-secondary hover:border-accent hover:text-accent"
+                >
+                  {validatingTopicId === topic.id ? "Cerrar validación" : "Validar conocimiento"}
+                </button>
+                {topic.completed_at ? (
+                  <TopicStateBadge state={computeTopicLearningState({ completedAt: topic.completed_at })} />
+                ) : (
+                  <TopicCompleteControl topic={topic} onReload={onReload} />
+                )}
+              </div>
             </div>
             {topicActivities.length > 0 && (
               <ul className="mt-1 space-y-0.5 pl-3 text-xs text-text-muted">
@@ -90,6 +101,16 @@ function TopicList({
                   </li>
                 ))}
               </ul>
+            )}
+            {validatingTopicId === topic.id && (
+              <div className="mt-2">
+                <ValidationPanel
+                  topicId={topic.id}
+                  topicTitle={topic.title}
+                  onClose={() => setValidatingTopicId(null)}
+                  onAccepted={onReload}
+                />
+              </div>
             )}
           </li>
         );
