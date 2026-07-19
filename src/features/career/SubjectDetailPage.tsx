@@ -43,6 +43,7 @@ const RELATION_TYPE_LABEL: Record<NonNullable<BibliographicSourceRow["relation_t
   descartada: "Descartada",
 };
 import { getSubjectXpBudgetTotal, getSubjectXpTotal } from "@/services/xp";
+import { KnowledgeHistoryPanel } from "./KnowledgeHistoryPanel";
 import {
   checkSubjectCompletionGate,
   completeSubject,
@@ -291,6 +292,13 @@ export function SubjectDetailPage() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Historial de conocimiento</h2>
+        <div className="mt-2">
+          <KnowledgeHistoryPanel subjectId={subject.id} />
+        </div>
       </section>
     </div>
   );

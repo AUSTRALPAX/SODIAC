@@ -3,6 +3,7 @@ import { completeTopic, previewTopicCompletion } from "@/services/completionXp";
 import { computeTopicLearningState } from "@/services/learningState";
 import { TopicStateBadge } from "@/components/TopicStateBadge";
 import { ValidationPanel } from "./ValidationPanel";
+import { KnowledgeHistoryPanel } from "./KnowledgeHistoryPanel";
 import type { TopicRow } from "@/database/types";
 import type { CareerData } from "./useCareerData";
 
@@ -67,6 +68,7 @@ function TopicList({
   onReload: () => void;
 }) {
   const [validatingTopicId, setValidatingTopicId] = useState<string | null>(null);
+  const [historyTopicId, setHistoryTopicId] = useState<string | null>(null);
 
   return (
     <ul className="divide-y divide-border-subtle border-t border-border-subtle">
@@ -77,6 +79,12 @@ function TopicList({
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="text-text-primary">{topic.title}</span>
               <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => setHistoryTopicId(historyTopicId === topic.id ? null : topic.id)}
+                  className="rounded border border-border px-2 py-0.5 text-xs text-text-secondary hover:border-accent hover:text-accent"
+                >
+                  {historyTopicId === topic.id ? "Cerrar historial" : "Ver historial"}
+                </button>
                 <button
                   onClick={() => setValidatingTopicId(validatingTopicId === topic.id ? null : topic.id)}
                   className="rounded border border-border px-2 py-0.5 text-xs text-text-secondary hover:border-accent hover:text-accent"
@@ -101,6 +109,11 @@ function TopicList({
                   </li>
                 ))}
               </ul>
+            )}
+            {historyTopicId === topic.id && (
+              <div className="mt-2">
+                <KnowledgeHistoryPanel topicId={topic.id} />
+              </div>
             )}
             {validatingTopicId === topic.id && (
               <div className="mt-2">
