@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CompetencyRow,
+  CurriculumUnitRow,
   FundamentalQuestionRow,
   ObsidianNoteRow,
   SubjectCompetencyRow,
   SubjectFundamentalQuestionRow,
   SubjectRow,
+  TopicAttributeWeightRow,
   TopicCompetencyRow,
   TopicFundamentalQuestionRow,
   TopicRow,
@@ -44,6 +46,8 @@ let subjectCompetencies: ReturnType<typeof makeMemoryRepo<SubjectCompetencyRow>>
 let topicFundamentalQuestions: ReturnType<typeof makeMemoryRepo<TopicFundamentalQuestionRow>>;
 let topicCompetencies: ReturnType<typeof makeMemoryRepo<TopicCompetencyRow>>;
 let curriculumDependencies: ReturnType<typeof makeMemoryRepo<CurriculumDependencyRow>>;
+let curriculumUnits: ReturnType<typeof makeMemoryRepo<CurriculumUnitRow>>;
+let topicAttributeWeights: ReturnType<typeof makeMemoryRepo<TopicAttributeWeightRow>>;
 
 vi.mock("@/database/entities", () => ({
   get fundamentalQuestionsRepo() {
@@ -75,6 +79,12 @@ vi.mock("@/database/entities", () => ({
   },
   get curriculumDependenciesRepo() {
     return curriculumDependencies;
+  },
+  get curriculumUnitsRepo() {
+    return curriculumUnits;
+  },
+  get topicAttributeWeightsRepo() {
+    return topicAttributeWeights;
   },
 }));
 
@@ -133,6 +143,8 @@ beforeEach(() => {
   topicFundamentalQuestions = makeMemoryRepo<TopicFundamentalQuestionRow>([]);
   topicCompetencies = makeMemoryRepo<TopicCompetencyRow>([]);
   curriculumDependencies = makeMemoryRepo<CurriculumDependencyRow>([]);
+  curriculumUnits = makeMemoryRepo<CurriculumUnitRow>([]);
+  topicAttributeWeights = makeMemoryRepo<TopicAttributeWeightRow>([]);
 });
 
 describe("importCareerFromObsidian (Fase J) — reconciliación con datos sintéticos", () => {
@@ -382,6 +394,101 @@ describe("computeAcademicIntegrityAudit (sección 12) — solo lectura", () => {
     expect(audit.duplicateExternalRefs).toEqual([]);
     expect(audit.brokenSubjectQuestionRefs).toBe(0);
     expect(audit.brokenTopicCompetencyRefs).toBe(0);
+    expect(audit.duplicateTopicTitles).toEqual([]);
+    expect(audit.duplicateCurriculumUnitTitles).toEqual([]);
+    expect(audit.circularDependencyCount).toBe(0);
+  });
+
+  function integrityTopicRow(overrides: Partial<TopicRow> & { id: string; subject_id: string }): TopicRow {
+    return {
+      competency_id: null,
+      learning_stage_id: null,
+      curriculum_unit_id: null,
+      title: overrides.id,
+      description: null,
+      completed_at: null,
+      external_ref: null,
+      ...baseRow(),
+      sort_order: 0,
+      ...overrides,
+    };
+  }
+
+  it("detecta temas con título casi idéntico dentro de la misma materia (acentos/mayúsculas no importan)", async () => {
+    subjects.rows.push({ id: "s1", fundamental_question_id: "q1", title: "Materia", description: null, ...baseRow(), credits: 1, complexity: 1, importance: 1, estimated_load: 1, is_mandatory: 1, budgeted_xp: null, completed_at: null, completion_budgeted_xp: null, learning_stage_id: null, career_id: null, external_ref: null });
+    topics.rows.push(
+      integrityTopicRow({ id: "t1", subject_id: "s1", title: "Formación de precios" }),
+      integrityTopicRow({ id: "t2", subject_id: "s1", title: "formacion de precios" }), // mismo título, sin tilde
+      integrityTopicRow({ id: "t3", subject_id: "s1", title: "Otro tema, sin relación" }),
+    );
+
+    const audit = await computeAcademicIntegrityAudit();
+
+    expect(audit.duplicateTopicTitles).toEqual([{ subjectId: "s1", title: "Formación de precios", count: 2 }]);
+  });
+
+  it("no reporta duplicado si el mismo título aparece en materias distintas", async () => {
+    subjects.rows.push(
+      { id: "s1", fundamental_question_id: "q1", title: "M1", description: null, ...baseRow(), credits: 1, complexity: 1, importance: 1, estimated_load: 1, is_mandatory: 1, budgeted_xp: null, completed_at: null, completion_budgeted_xp: null, learning_stage_id: null, career_id: null, external_ref: null },
+      { id: "s2", fundamental_question_id: "q1", title: "M2", description: null, ...baseRow(), credits: 1, complexity: 1, importance: 1, estimated_load: 1, is_mandatory: 1, budgeted_xp: null, completed_at: null, completion_budgeted_xp: null, learning_stage_id: null, career_id: null, external_ref: null },
+    );
+    topics.rows.push(
+      integrityTopicRow({ id: "t1", subject_id: "s1", title: "Repetido" }),
+      integrityTopicRow({ id: "t2", subject_id: "s2", title: "Repetido" }),
+    );
+
+    const audit = await computeAcademicIntegrityAudit();
+
+    expect(audit.duplicateTopicTitles).toEqual([]);
+  });
+
+  it("detecta un ciclo simple en curriculum_dependency", async () => {
+    subjects.rows.push({ id: "s1", fundamental_question_id: "q1", title: "M", description: null, ...baseRow(), credits: 1, complexity: 1, importance: 1, estimated_load: 1, is_mandatory: 1, budgeted_xp: null, completed_at: null, completion_budgeted_xp: null, learning_stage_id: null, career_id: null, external_ref: null });
+    topics.rows.push(
+      integrityTopicRow({ id: "t1", subject_id: "s1" }),
+      integrityTopicRow({ id: "t2", subject_id: "s1" }),
+      integrityTopicRow({ id: "t3", subject_id: "s1" }),
+    );
+    curriculumDependencies.rows.push(
+      { id: "d1", from_topic_id: "t1", to_topic_id: "t2", dependency_type: "requires", status: "activa", notes: null, created_at: "", updated_at: "" },
+      { id: "d2", from_topic_id: "t2", to_topic_id: "t3", dependency_type: "requires", status: "activa", notes: null, created_at: "", updated_at: "" },
+      { id: "d3", from_topic_id: "t3", to_topic_id: "t1", dependency_type: "requires", status: "activa", notes: null, created_at: "", updated_at: "" },
+    );
+
+    const audit = await computeAcademicIntegrityAudit();
+
+    expect(audit.circularDependencyCount).toBeGreaterThan(0);
+  });
+
+  it("no reporta ciclo cuando las dependencias forman una cadena lineal", async () => {
+    subjects.rows.push({ id: "s1", fundamental_question_id: "q1", title: "M", description: null, ...baseRow(), credits: 1, complexity: 1, importance: 1, estimated_load: 1, is_mandatory: 1, budgeted_xp: null, completed_at: null, completion_budgeted_xp: null, learning_stage_id: null, career_id: null, external_ref: null });
+    topics.rows.push(
+      integrityTopicRow({ id: "t1", subject_id: "s1" }),
+      integrityTopicRow({ id: "t2", subject_id: "s1" }),
+      integrityTopicRow({ id: "t3", subject_id: "s1" }),
+    );
+    curriculumDependencies.rows.push(
+      { id: "d1", from_topic_id: "t1", to_topic_id: "t2", dependency_type: "requires", status: "activa", notes: null, created_at: "", updated_at: "" },
+      { id: "d2", from_topic_id: "t2", to_topic_id: "t3", dependency_type: "requires", status: "activa", notes: null, created_at: "", updated_at: "" },
+    );
+
+    const audit = await computeAcademicIntegrityAudit();
+
+    expect(audit.circularDependencyCount).toBe(0);
+  });
+
+  it("cuenta temas sin nivel objetivo de dominio y sin pesos de atributo", async () => {
+    subjects.rows.push({ id: "s1", fundamental_question_id: "q1", title: "M", description: null, ...baseRow(), credits: 1, complexity: 1, importance: 1, estimated_load: 1, is_mandatory: 1, budgeted_xp: null, completed_at: null, completion_budgeted_xp: null, learning_stage_id: null, career_id: null, external_ref: null });
+    topics.rows.push(
+      integrityTopicRow({ id: "t1", subject_id: "s1", target_mastery_level: 3 }),
+      integrityTopicRow({ id: "t2", subject_id: "s1" }), // sin target_mastery_level
+    );
+    topicAttributeWeights.rows.push({ id: "w1", topic_id: "t1", attribute_id: "attr-economia", weight_pct: 100, created_at: "" });
+
+    const audit = await computeAcademicIntegrityAudit();
+
+    expect(audit.topicsWithoutTargetMasteryCount).toBe(1);
+    expect(audit.topicsWithoutAttributeWeightsCount).toBe(1);
   });
 });
 

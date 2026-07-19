@@ -748,6 +748,19 @@ export function ObsidianPage() {
                     value={String(integrityAudit.brokenTopicCompetencyRefs + integrityAudit.brokenSubjectQuestionRefs)}
                     tone={integrityAudit.brokenTopicCompetencyRefs + integrityAudit.brokenSubjectQuestionRefs > 0 ? "danger" : "success"}
                   />
+                  <DiagnosticItem
+                    label="Ciclos de dependencia"
+                    value={String(integrityAudit.circularDependencyCount)}
+                    tone={integrityAudit.circularDependencyCount > 0 ? "danger" : "success"}
+                  />
+                  <DiagnosticItem
+                    label="Temas sin nivel objetivo"
+                    value={String(integrityAudit.topicsWithoutTargetMasteryCount)}
+                  />
+                  <DiagnosticItem
+                    label="Temas sin atributos"
+                    value={String(integrityAudit.topicsWithoutAttributeWeightsCount)}
+                  />
                 </div>
 
                 {integrityAudit.brokenTopicCompetencyRefs > 0 && (
@@ -783,6 +796,32 @@ export function ObsidianPage() {
                   </div>
                 )}
 
+                {integrityAudit.duplicateTopicTitles.length > 0 && (
+                  <div>
+                    <p className="font-semibold text-warning">Temas con título casi idéntico en la misma materia:</p>
+                    <ul className="mt-1 list-disc pl-4">
+                      {integrityAudit.duplicateTopicTitles.map((d, i) => (
+                        <li key={i}>
+                          "{d.title}" aparece {d.count} veces
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {integrityAudit.duplicateCurriculumUnitTitles.length > 0 && (
+                  <div>
+                    <p className="font-semibold text-warning">Unidades con título casi idéntico en la misma materia:</p>
+                    <ul className="mt-1 list-disc pl-4">
+                      {integrityAudit.duplicateCurriculumUnitTitles.map((d, i) => (
+                        <li key={i}>
+                          "{d.title}" aparece {d.count} veces
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {integrityAudit.notesLookingLikeTopicsButUntyped.length > 0 && (
                   <div>
                     <p className="font-semibold text-warning">
@@ -809,9 +848,18 @@ export function ObsidianPage() {
                   integrityAudit.duplicateExternalRefs.length === 0 &&
                   integrityAudit.notesLookingLikeTopicsButUntyped.length === 0 &&
                   integrityAudit.brokenTopicCompetencyRefs === 0 &&
-                  integrityAudit.brokenSubjectQuestionRefs === 0 && (
+                  integrityAudit.brokenSubjectQuestionRefs === 0 &&
+                  integrityAudit.duplicateTopicTitles.length === 0 &&
+                  integrityAudit.duplicateCurriculumUnitTitles.length === 0 &&
+                  integrityAudit.circularDependencyCount === 0 && (
                     <p className="text-success">Sin inconsistencias detectadas.</p>
                   )}
+                {(integrityAudit.topicsWithoutTargetMasteryCount > 0 || integrityAudit.topicsWithoutAttributeWeightsCount > 0) && (
+                  <p className="text-text-muted">
+                    Esto es esperado hasta que se complete la autoría de contenido de la mejora integral (nivel
+                    objetivo de dominio y pesos de atributos por tema) — no es un error de sincronización.
+                  </p>
+                )}
               </div>
             )}
           </div>

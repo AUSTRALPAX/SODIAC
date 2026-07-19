@@ -60,6 +60,7 @@ export interface SubjectRow extends BaseRow {
   career_id: string | null;
   /** ID nativo del vault (p. ej. "MAT-01"), null/ausente si la fila no viene de Obsidian. */
   external_ref?: string | null;
+  curriculum_version_id?: string | null;
 }
 
 export interface CareerRow extends BaseRow {
@@ -96,6 +97,9 @@ export interface TopicRow extends BaseRow {
   completed_at: string | null;
   /** ID nativo del vault (p. ej. "T-01.01"), null/ausente si la fila no viene de Obsidian. */
   external_ref?: string | null;
+  curriculum_version_id?: string | null;
+  /** Nivel de dominio (0-5) que este tema apunta a alcanzar — nullable, no inventado retroactivamente. */
+  target_mastery_level?: number | null;
 }
 
 /** Vínculos secundarios (sección 19): la relación jerárquica primaria sigue
@@ -709,6 +713,53 @@ export interface XpEventRow {
   reversal_of: string | null;
   created_at: string;
   metadata_json: string | null;
+  xp_rules_version_id?: string | null;
+}
+
+export interface XpRulesVersionRow {
+  id: string;
+  label: string;
+  career_total_xp: number;
+  max_level: number;
+  level_curve_exponent: number;
+  graded_share: number;
+  completion_share: number;
+  category_weights_json: string;
+  completion_category_weights_json: string;
+  frozen_at_level: number | null;
+  frozen_at_xp: number | null;
+  is_current: number;
+  created_at: string;
+  updated_at: string;
+  notes: string | null;
+}
+
+export interface CurriculumVersionRow {
+  id: string;
+  label: string;
+  description: string | null;
+  is_current: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AcademicAttributeRow {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  status: "activo" | "archivado";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TopicAttributeWeightRow {
+  id: string;
+  topic_id: string;
+  attribute_id: string;
+  weight_pct: number;
+  created_at: string;
 }
 
 export interface AcademicLevelHistoryRow {

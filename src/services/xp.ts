@@ -4,9 +4,23 @@ import {
   xpEventsRepo,
 } from "@/database/entities";
 import type { CompletionXpCategory, SubjectRow, XpCategory, XpEventRow } from "@/database/types";
+import { ensureCurrentXpRulesVersion } from "@/services/xpRulesVersion";
 
 const now = () => new Date().toISOString();
 
+/**
+ * Estas constantes siguen siendo la fuente de verdad operativa (todas las
+ * funciones de este archivo son síncronas y muy usadas así en toda la app —
+ * `AcademicSettingsTab`, `masterSchedule.ts`, tests). La fila `xp-rules-v1`
+ * en `xp_rules_version` (ver `xpRulesVersion.ts`) es un snapshot EXACTO de
+ * estos mismos valores, y cada `xp_event` nuevo queda taggeado con la
+ * versión vigente — así que ya hay trazabilidad histórica real. La
+ * recalibración (subir `CAREER_TOTAL_XP` sin bajar el nivel de nadie, vía
+ * la curva por tramos que ya soporta `xpRulesVersion.ts`) se implementa en
+ * la Fase 3, cuando además haya que convertir estas funciones a leer la
+ * versión vigente en vivo — un cambio más grande, deliberado, no uno de
+ * paso en esta fase de base.
+ */
 export const CAREER_TOTAL_XP = 100_000;
 export const MAX_LEVEL = 100;
 
@@ -223,6 +237,8 @@ export async function awardXp(input: AwardXpInput): Promise<AwardXpResult> {
   // Reintento con la MISMA clave: usar un id secuencial adicional para no violar la unicidad.
   const finalKey = existingForKey.length > 0 ? `${idempotencyKey}:rev${existingForKey.length}` : idempotencyKey;
 
+  const xpRulesVersion = await ensureCurrentXpRulesVersion();
+
   const event: XpEventRow = {
     id: crypto.randomUUID(),
     date: now(),
@@ -239,6 +255,7 @@ export async function awardXp(input: AwardXpInput): Promise<AwardXpResult> {
     reversal_of: null,
     created_at: now(),
     metadata_json: null,
+    xp_rules_version_id: xpRulesVersion.id,
   };
   await xpEventsRepo.insert(event);
   await checkAndRecordLevelUp();

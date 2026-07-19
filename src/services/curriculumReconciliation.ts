@@ -14,16 +14,29 @@
 import {
   competenciesRepo,
   curriculumDependenciesRepo,
+  curriculumUnitsRepo,
   fundamentalQuestionsRepo,
   obsidianNotesRepo,
   subjectCompetenciesRepo,
   subjectFundamentalQuestionsRepo,
   subjectsRepo,
+  topicAttributeWeightsRepo,
   topicCompetenciesRepo,
   topicFundamentalQuestionsRepo,
   topicsRepo,
 } from "@/database/entities";
 import type { CompetencyRow, SubjectRow, TopicRow } from "@/database/types";
+
+/** Mismo enfoque que ya usa libraryAustrofinancialImport.ts para bibliografía: solo compara, nunca altera el texto visible. */
+function normalizeForComparison(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/['".,;:-]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 const now = () => new Date().toISOString();
 
@@ -622,6 +635,16 @@ export interface AcademicIntegrityAudit {
   duplicateExternalRefs: { table: string; externalRef: string; count: number }[];
   brokenTopicCompetencyRefs: number; // topic.competency_id que no existe en competency
   brokenSubjectQuestionRefs: number; // subject.fundamental_question_id que no existe en fundamental_question
+  /** Unidades curriculares con el mismo título (normalizado) dentro de la misma materia. */
+  duplicateCurriculumUnitTitles: { subjectId: string; title: string; count: number }[];
+  /** Temas con título casi idéntico (normalizado) dentro de la misma materia. */
+  duplicateTopicTitles: { subjectId: string; title: string; count: number }[];
+  /** Ciclos detectados en curriculum_dependency (tema -> prerequisito -> ... -> el mismo tema). */
+  circularDependencyCount: number;
+  /** Temas sin un nivel objetivo de dominio (0-5) asignado todavía. */
+  topicsWithoutTargetMasteryCount: number;
+  /** Temas sin ninguna fila en topic_attribute_weight todavía. */
+  topicsWithoutAttributeWeightsCount: number;
 }
 
 /**
@@ -630,12 +653,15 @@ export interface AcademicIntegrityAudit {
  * revisar notas puntuales, o si todo sigue consistente después de importar.
  */
 export async function computeAcademicIntegrityAudit(): Promise<AcademicIntegrityAudit> {
-  const [notes, subjects, topics, competencies, questions] = await Promise.all([
+  const [notes, subjects, topics, competencies, questions, curriculumUnits, dependencies, attributeWeights] = await Promise.all([
     obsidianNotesRepo.list(),
     subjectsRepo.list({ where: "archived_at IS NULL" }),
     topicsRepo.list({ where: "archived_at IS NULL" }),
     competenciesRepo.list({ where: "archived_at IS NULL" }),
     fundamentalQuestionsRepo.list({ where: "archived_at IS NULL" }),
+    curriculumUnitsRepo.list({ where: "archived_at IS NULL" }),
+    curriculumDependenciesRepo.list({ where: "status = 'activa'" }),
+    topicAttributeWeightsRepo.list(),
   ]);
 
   const sodiacIds = new Set(notes.map((n) => n.sodiac_id).filter((id): id is string => !!id));
@@ -670,6 +696,71 @@ export async function computeAcademicIntegrityAudit(): Promise<AcademicIntegrity
     (s) => s.fundamental_question_id && !questionIds.has(s.fundamental_question_id),
   ).length;
 
+  // Unidades curriculares con el mismo título (normalizado) dentro de la misma materia.
+  // `learning_stage.code` ya tiene un UNIQUE en la base — un duplicado ahí es
+  // imposible de insertar, así que no hace falta chequearlo acá.
+  const duplicateCurriculumUnitTitles: AcademicIntegrityAudit["duplicateCurriculumUnitTitles"] = [];
+  {
+    const counts = new Map<string, { subjectId: string; title: string; count: number }>();
+    for (const unit of curriculumUnits) {
+      const key = `${unit.subject_id}::${normalizeForComparison(unit.title)}`;
+      const existing = counts.get(key);
+      if (existing) existing.count++;
+      else counts.set(key, { subjectId: unit.subject_id, title: unit.title, count: 1 });
+    }
+    for (const entry of counts.values()) {
+      if (entry.count > 1) duplicateCurriculumUnitTitles.push(entry);
+    }
+  }
+
+  // Temas con título casi idéntico (normalizado) dentro de la misma materia.
+  const duplicateTopicTitles: AcademicIntegrityAudit["duplicateTopicTitles"] = [];
+  {
+    const counts = new Map<string, { subjectId: string; title: string; count: number }>();
+    for (const topic of topics) {
+      const key = `${topic.subject_id}::${normalizeForComparison(topic.title)}`;
+      const existing = counts.get(key);
+      if (existing) existing.count++;
+      else counts.set(key, { subjectId: topic.subject_id, title: topic.title, count: 1 });
+    }
+    for (const entry of counts.values()) {
+      if (entry.count > 1) duplicateTopicTitles.push(entry);
+    }
+  }
+
+  // Ciclos en curriculum_dependency: DFS con tres colores (blanco/gris/negro).
+  let circularDependencyCount = 0;
+  {
+    const adjacency = new Map<string, string[]>();
+    for (const dep of dependencies) {
+      const list = adjacency.get(dep.from_topic_id) ?? [];
+      list.push(dep.to_topic_id);
+      adjacency.set(dep.from_topic_id, list);
+    }
+    const state = new Map<string, "visiting" | "done">();
+    const foundCycleAt = new Set<string>();
+    function visit(node: string): void {
+      state.set(node, "visiting");
+      for (const next of adjacency.get(node) ?? []) {
+        const nextState = state.get(next);
+        if (nextState === "visiting") {
+          foundCycleAt.add(node);
+        } else if (nextState !== "done") {
+          visit(next);
+        }
+      }
+      state.set(node, "done");
+    }
+    for (const node of adjacency.keys()) {
+      if (!state.has(node)) visit(node);
+    }
+    circularDependencyCount = foundCycleAt.size;
+  }
+
+  const topicsWithoutTargetMasteryCount = topics.filter((t) => t.target_mastery_level == null).length;
+  const topicIdsWithAttributeWeights = new Set(attributeWeights.map((w) => w.topic_id));
+  const topicsWithoutAttributeWeightsCount = topics.filter((t) => !topicIdsWithAttributeWeights.has(t.id)).length;
+
   return {
     totalNotes: notes.length,
     notesWithSodiacId: sodiacIds.size,
@@ -681,6 +772,11 @@ export async function computeAcademicIntegrityAudit(): Promise<AcademicIntegrity
     duplicateExternalRefs,
     brokenTopicCompetencyRefs,
     brokenSubjectQuestionRefs,
+    duplicateCurriculumUnitTitles,
+    duplicateTopicTitles,
+    circularDependencyCount,
+    topicsWithoutTargetMasteryCount,
+    topicsWithoutAttributeWeightsCount,
   };
 }
 

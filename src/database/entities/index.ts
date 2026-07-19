@@ -1,6 +1,7 @@
 import { createRepository } from "../repository";
 import type {
   AcademicAssignmentRow,
+  AcademicAttributeRow,
   AcademicEvaluationRow,
   AcademicLevelHistoryRow,
   AcademicRankRow,
@@ -18,6 +19,7 @@ import type {
   CurriculumActivityRow,
   CurriculumDependencyRow,
   CurriculumUnitRow,
+  CurriculumVersionRow,
   DailyPlanRow,
   DocumentVersionRow,
   EvaluationImportRow,
@@ -47,12 +49,14 @@ import type {
   SubjectRow,
   TaskHistoryRow,
   TaskRow,
+  TopicAttributeWeightRow,
   TopicCompetencyRow,
   TopicFundamentalQuestionRow,
   TopicRow,
   UserSettingRow,
   WeeklyPlanRow,
   XpEventRow,
+  XpRulesVersionRow,
 } from "../types";
 
 export const fundamentalQuestionsRepo = createRepository<FundamentalQuestionRow>("fundamental_question");
@@ -112,3 +116,9 @@ export const progressFormulaVersionsRepo = createRepository<ProgressFormulaVersi
 export const careerProgressSnapshotsRepo = createRepository<CareerProgressSnapshotRow>("career_progress_snapshot");
 export const subjectProgressSnapshotsRepo = createRepository<SubjectProgressSnapshotRow>("subject_progress_snapshot");
 export const evaluationImportsRepo = createRepository<EvaluationImportRow>("evaluation_import");
+
+// --- Mejora integral: versionado de reglas de XP, currículo y atributos académicos ---
+export const xpRulesVersionsRepo = createRepository<XpRulesVersionRow>("xp_rules_version");
+export const curriculumVersionsRepo = createRepository<CurriculumVersionRow>("curriculum_version");
+export const academicAttributesRepo = createRepository<AcademicAttributeRow>("academic_attribute");
+export const topicAttributeWeightsRepo = createRepository<TopicAttributeWeightRow>("topic_attribute_weight");
