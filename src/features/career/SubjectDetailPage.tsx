@@ -44,6 +44,8 @@ const RELATION_TYPE_LABEL: Record<NonNullable<BibliographicSourceRow["relation_t
 };
 import { getSubjectXpBudgetTotal, getSubjectXpTotal } from "@/services/xp";
 import { KnowledgeHistoryPanel } from "./KnowledgeHistoryPanel";
+import { computeTopicLearningState, loadTopicLearningSignals, type TopicLearningSignals } from "@/services/learningState";
+import { TopicStateBadge } from "@/components/TopicStateBadge";
 import {
   checkSubjectCompletionGate,
   completeSubject,
@@ -67,6 +69,7 @@ interface SubjectDetail {
   bibliography: BibliographicSourceRow[];
   xpObtained: number;
   xpBudgetTotal: number;
+  learningSignals: Map<string, TopicLearningSignals>;
 }
 
 export function SubjectDetailPage() {
@@ -82,7 +85,7 @@ export function SubjectDetailPage() {
       setLoading(false);
       return;
     }
-    const [stage, question, topics, units, projects, sessions, transcript, sources, xpObtained, xpBudget, subjectGate] =
+    const [stage, question, topics, units, projects, sessions, transcript, sources, xpObtained, xpBudget, subjectGate, learningSignals] =
       await Promise.all([
         subject.learning_stage_id ? learningStagesRepo.getById(subject.learning_stage_id) : Promise.resolve(null),
         fundamentalQuestionsRepo.getById(subject.fundamental_question_id),
@@ -95,6 +98,7 @@ export function SubjectDetailPage() {
         getSubjectXpTotal(subjectId),
         getSubjectXpBudgetTotal(subjectId),
         checkSubjectCompletionGate(subjectId),
+        loadTopicLearningSignals(),
       ]);
 
     const competencyIds = new Set(topics.map((t) => t.competency_id).filter((c): c is string => !!c));
@@ -118,6 +122,7 @@ export function SubjectDetailPage() {
       bibliography: sources,
       xpObtained: xpObtained,
       xpBudgetTotal: xpBudget.total,
+      learningSignals,
     });
     setGate(subjectGate);
     setLoading(false);
@@ -130,7 +135,7 @@ export function SubjectDetailPage() {
   if (loading) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
   if (!detail) return <div className="p-10 text-sm text-danger">La materia indicada no existe.</div>;
 
-  const { subject, stage, question, competencies, units, topics, projects, sessions, transcript, resources, bibliography, xpObtained, xpBudgetTotal } = detail;
+  const { subject, stage, question, competencies, units, topics, projects, sessions, transcript, resources, bibliography, xpObtained, xpBudgetTotal, learningSignals } = detail;
   const completedTopics = topics.filter((t) => t.completed_at).length;
   const progressPct = topics.length > 0 ? Math.round((completedTopics / topics.length) * 100) : 0;
   const xpTotal = xpBudgetTotal;
@@ -205,7 +210,12 @@ export function SubjectDetailPage() {
                   .map((t) => (
                     <li key={t.id} className="flex items-center justify-between gap-2">
                       <span>· {t.title}</span>
-                      {t.completed_at ? <span className="text-success">✓</span> : <TopicCompleteInline topic={t} onReload={load} />}
+                      <span className="flex items-center gap-2">
+                        <TopicStateBadge
+                          state={computeTopicLearningState({ completedAt: t.completed_at, ...learningSignals.get(t.id) })}
+                        />
+                        {!t.completed_at && <TopicCompleteInline topic={t} onReload={load} />}
+                      </span>
                     </li>
                   ))}
               </ul>
@@ -220,7 +230,12 @@ export function SubjectDetailPage() {
                   .map((t) => (
                     <li key={t.id} className="flex items-center justify-between gap-2">
                       <span>· {t.title}</span>
-                      {t.completed_at ? <span className="text-success">✓</span> : <TopicCompleteInline topic={t} onReload={load} />}
+                      <span className="flex items-center gap-2">
+                        <TopicStateBadge
+                          state={computeTopicLearningState({ completedAt: t.completed_at, ...learningSignals.get(t.id) })}
+                        />
+                        {!t.completed_at && <TopicCompleteInline topic={t} onReload={load} />}
+                      </span>
                     </li>
                   ))}
               </ul>

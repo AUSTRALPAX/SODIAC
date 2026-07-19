@@ -8,6 +8,7 @@ import {
   subjectsRepo,
   topicsRepo,
 } from "@/database/entities";
+import { loadTopicLearningSignals, type TopicLearningSignals } from "@/services/learningState";
 import type {
   CompetencyRow,
   CurriculumActivityRow,
@@ -26,6 +27,8 @@ export interface CareerData {
   units: CurriculumUnitRow[];
   topics: TopicRow[];
   activities: CurriculumActivityRow[];
+  /** Señales reales de aprendizaje por tema (sesiones, notas, validación, repaso) — ver learningState.ts. */
+  learningSignals: Map<string, TopicLearningSignals>;
   loading: boolean;
   /** Vuelve a leer todo desde la base — llamar después de marcar algo como completado. */
   reload: () => void;
@@ -45,6 +48,7 @@ export function useCareerData(): CareerData {
     units: [],
     topics: [],
     activities: [],
+    learningSignals: new Map(),
   });
   const [loading, setLoading] = useState(true);
 
@@ -58,8 +62,9 @@ export function useCareerData(): CareerData {
       curriculumUnitsRepo.list({ where: "archived_at IS NULL", orderBy: "sort_order" }),
       topicsRepo.list({ where: "archived_at IS NULL", orderBy: "sort_order" }),
       curriculumActivitiesRepo.list({ where: "archived_at IS NULL", orderBy: "scheduled_date" }),
-    ]).then(([questions, competencies, stages, subjects, units, topics, activities]) => {
-      setData({ questions, competencies, stages, subjects, units, topics, activities });
+      loadTopicLearningSignals(),
+    ]).then(([questions, competencies, stages, subjects, units, topics, activities, learningSignals]) => {
+      setData({ questions, competencies, stages, subjects, units, topics, activities, learningSignals });
       setLoading(false);
     });
   }, []);

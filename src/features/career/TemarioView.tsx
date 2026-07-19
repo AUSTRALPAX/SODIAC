@@ -37,7 +37,12 @@ export function TemarioView({ data }: { data: CareerData }) {
                         {unit.budgeted_xp != null ? ` · ${unit.budgeted_xp} XP` : ""}
                       </span>
                     </summary>
-                    <TopicList topics={topics} activities={data.activities} onReload={data.reload} />
+                    <TopicList
+                      topics={topics}
+                      activities={data.activities}
+                      learningSignals={data.learningSignals}
+                      onReload={data.reload}
+                    />
                   </details>
                 );
               })}
@@ -47,7 +52,12 @@ export function TemarioView({ data }: { data: CareerData }) {
                     Temas sin unidad asignada
                     <span className="ml-2 text-xs text-text-muted">{topicsWithoutUnit.length}</span>
                   </summary>
-                  <TopicList topics={topicsWithoutUnit} activities={data.activities} onReload={data.reload} />
+                  <TopicList
+                    topics={topicsWithoutUnit}
+                    activities={data.activities}
+                    learningSignals={data.learningSignals}
+                    onReload={data.reload}
+                  />
                 </details>
               )}
             </div>
@@ -61,10 +71,12 @@ export function TemarioView({ data }: { data: CareerData }) {
 function TopicList({
   topics,
   activities,
+  learningSignals,
   onReload,
 }: {
   topics: CareerData["topics"];
   activities: CareerData["activities"];
+  learningSignals: CareerData["learningSignals"];
   onReload: () => void;
 }) {
   const [validatingTopicId, setValidatingTopicId] = useState<string | null>(null);
@@ -91,11 +103,10 @@ function TopicList({
                 >
                   {validatingTopicId === topic.id ? "Cerrar validación" : "Validar conocimiento"}
                 </button>
-                {topic.completed_at ? (
-                  <TopicStateBadge state={computeTopicLearningState({ completedAt: topic.completed_at })} />
-                ) : (
-                  <TopicCompleteControl topic={topic} onReload={onReload} />
-                )}
+                <TopicStateBadge
+                  state={computeTopicLearningState({ completedAt: topic.completed_at, ...learningSignals.get(topic.id) })}
+                />
+                {!topic.completed_at && <TopicCompleteControl topic={topic} onReload={onReload} />}
               </div>
             </div>
             {topicActivities.length > 0 && (
