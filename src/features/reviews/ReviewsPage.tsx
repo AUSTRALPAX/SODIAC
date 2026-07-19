@@ -11,7 +11,15 @@ import {
   reactivateReview,
   type ReviewWithContext,
 } from "@/services/reviews";
+import type { ReviewQuality } from "@/services/reviewSpacing";
 import type { ReviewRow } from "@/database/types";
+
+const QUALITY_LABEL: Record<ReviewQuality, string> = {
+  otra_vez: "Otra vez",
+  dificil: "Difícil",
+  bien: "Bien",
+  facil: "Fácil",
+};
 import { localDateInputToIso } from "@/utils/date";
 
 const STATE_LABEL: Record<ReviewRow["state"], string> = {
@@ -57,8 +65,8 @@ export function ReviewsPage() {
     void refresh();
   }, [refresh]);
 
-  async function handleComplete(id: string) {
-    await completeReview(id);
+  async function handleComplete(id: string, quality: ReviewQuality) {
+    await completeReview(id, quality);
     await refresh();
   }
 
@@ -96,7 +104,8 @@ export function ReviewsPage() {
     <div className="mx-auto max-w-2xl p-10">
       <h1 className="font-display text-2xl">Repasos</h1>
       <p className="mt-1 text-sm text-text-secondary">
-        Cada repaso muestra por qué se sugiere. Podés posponerlo, marcarlo innecesario o dejarlo enfriar.
+        Cada repaso muestra por qué se sugiere. Al completarlo, indicá qué tan bien te salió: el próximo repaso se
+        programa solo según eso, y si ya retenés el tema a largo plazo se enfría automáticamente.
       </p>
 
       {reviews.length === 0 ? (
@@ -174,7 +183,7 @@ function ReviewGroup({
 }: {
   title: string;
   items: ReviewWithContext[];
-  onComplete: (id: string) => void;
+  onComplete: (id: string, quality: ReviewQuality) => void;
   onPostpone: (id: string) => void;
   onUnnecessary: (id: string) => void;
   onCooled: (id: string) => void;
@@ -214,9 +223,16 @@ function ReviewGroup({
               >
                 Iniciar sesión
               </Link>
-              <button onClick={() => onComplete(r.id)} className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-success hover:text-success">
-                Completar
-              </button>
+              {(Object.keys(QUALITY_LABEL) as ReviewQuality[]).map((quality) => (
+                <button
+                  key={quality}
+                  onClick={() => onComplete(r.id, quality)}
+                  className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-success hover:text-success"
+                  title="Completar este repaso indicando qué tan bien te salió"
+                >
+                  {QUALITY_LABEL[quality]}
+                </button>
+              ))}
               <button onClick={() => onPostpone(r.id)} className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-warning hover:text-warning">
                 Posponer
               </button>

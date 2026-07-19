@@ -1,7 +1,25 @@
 import { competenciesRepo, reviewsRepo, topicsRepo } from "@/database/entities";
 import type { ReviewRow } from "@/database/types";
+import {
+  addDaysIso,
+  computeNextSchedule,
+  isCooled,
+  INITIAL_SCHEDULE,
+  type ReviewQuality,
+  type ReviewSchedule,
+} from "@/services/reviewSpacing";
 
 const now = () => new Date().toISOString();
+
+function parseSchedule(reasonFactors: string | null): ReviewSchedule {
+  if (!reasonFactors) return INITIAL_SCHEDULE;
+  try {
+    const parsed = JSON.parse(reasonFactors) as { schedule?: ReviewSchedule };
+    return parsed.schedule ?? INITIAL_SCHEDULE;
+  } catch {
+    return INITIAL_SCHEDULE;
+  }
+}
 
 export interface ReviewWithContext extends ReviewRow {
   displayState: ReviewRow["state"];
@@ -61,8 +79,63 @@ export async function listReviewQueue(): Promise<ReviewWithContext[]> {
   return result;
 }
 
-export async function completeReview(id: string): Promise<void> {
-  await reviewsRepo.update(id, { state: "completado", completed_at: now() });
+/**
+ * Completa un repaso registrando qué tan bien salió (`quality`) y usa el
+ * algoritmo de espaciado real (`reviewSpacing.ts`) para decidir qué pasa
+ * después: si el intervalo resultante todavía es corto, programa
+ * automáticamente el próximo repaso; si ya cruzó el umbral de enfriamiento,
+ * crea un repaso "enfriado" en su lugar en vez de seguir reprogramando.
+ */
+export async function completeReview(id: string, quality: ReviewQuality): Promise<void> {
+  const review = await reviewsRepo.getById(id);
+  if (!review) return;
+
+  const prevSchedule = parseSchedule(review.reason_factors);
+  const nextSchedule = computeNextSchedule(prevSchedule, quality);
+  const completedAt = now();
+
+  await reviewsRepo.update(id, {
+    state: "completado",
+    completed_at: completedAt,
+    reason_factors: JSON.stringify({
+      ...safeParseFactors(review.reason_factors),
+      quality,
+      schedule: nextSchedule,
+    }),
+  });
+
+  const cooled = isCooled(nextSchedule);
+  const next: ReviewRow = {
+    id: crypto.randomUUID(),
+    competency_id: review.competency_id,
+    topic_id: review.topic_id,
+    evidence_id: null,
+    due_at: cooled ? null : addDaysIso(completedAt, nextSchedule.intervalDays),
+    state: cooled ? "enfriado" : "proximo",
+    reason_factors: JSON.stringify({
+      origen: cooled ? "enfriamiento_automatico" : "repaso_programado",
+      previous_review_id: id,
+      schedule: nextSchedule,
+    }),
+    completed_at: null,
+    status: "activo",
+    sort_order: 0,
+    notes: null,
+    tags: null,
+    created_at: completedAt,
+    updated_at: completedAt,
+    archived_at: null,
+  };
+  await reviewsRepo.insert(next);
+}
+
+function safeParseFactors(reasonFactors: string | null): Record<string, unknown> {
+  if (!reasonFactors) return {};
+  try {
+    return JSON.parse(reasonFactors) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
 export async function postponeReview(id: string, newDueAt: string): Promise<void> {
