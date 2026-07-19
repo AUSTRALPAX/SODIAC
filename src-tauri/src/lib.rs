@@ -9,14 +9,32 @@ mod vault_watcher;
 /// cierra la app. En vez de cerrar de inmediato, se intercepta el cierre,
 /// se le pide al frontend que flushee ese guardado, y solo cuando confirma
 /// (vía `confirm_app_close`) se deja pasar el cierre real.
+///
+/// `flush_requested` evita un bug encontrado en vivo: si el usuario (o una
+/// automatización) pide cerrar la ventana más de una vez mientras el primer
+/// flush todavía está en curso, cada `CloseRequested` volvía a emitir
+/// `sodiac://flush-before-close`, y cada flush terminado invocaba
+/// `confirm_app_close` por su cuenta — la segunda invocación llamaba
+/// `window.close()` sobre una ventana que la primera ya había empezado a
+/// destruir, lo que coincide con un panic conocido de `tao` en Windows
+/// ("cannot move state from Destroyed") y dejaba el proceso vivo pero sin
+/// responder a más cierres. Con este flag, un segundo `CloseRequested`
+/// mientras ya hay un flush en curso simplemente no hace nada más (el
+/// primer ciclo ya se va a encargar de cerrar la ventana).
 #[derive(Default)]
 struct CloseState {
     allow_close: AtomicBool,
+    flush_requested: AtomicBool,
 }
 
 #[tauri::command]
 fn confirm_app_close(app: tauri::AppHandle, state: tauri::State<CloseState>) {
-    state.allow_close.store(true, Ordering::SeqCst);
+    // Idempotente: si ya se había confirmado el cierre antes (por ejemplo,
+    // un segundo flush que termina tarde), no volver a llamar window.close()
+    // sobre una ventana que ya se está destruyendo.
+    if state.allow_close.swap(true, Ordering::SeqCst) {
+        return;
+    }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.close();
     }
@@ -212,6 +230,11 @@ pub fn run() {
                     return;
                 }
                 api.prevent_close();
+                if state.flush_requested.swap(true, Ordering::SeqCst) {
+                    // Ya hay un flush en curso de un CloseRequested anterior — no
+                    // pedir otro (ver comentario en CloseState).
+                    return;
+                }
                 log::info!("Cierre de ventana interceptado — solicitando flush de guardados pendientes al frontend.");
                 let _ = window.emit("sodiac://flush-before-close", ());
             }

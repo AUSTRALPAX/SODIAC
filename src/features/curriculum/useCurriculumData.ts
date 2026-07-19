@@ -29,6 +29,7 @@ import type {
 } from "@/database/types";
 import { getLatestMasteryByCompetency } from "@/services/mastery";
 import type { MasteryAssessmentRow } from "@/database/types";
+import { loadTopicLearningSignals, type TopicLearningSignals } from "@/services/learningState";
 
 export interface CurriculumData {
   questions: FundamentalQuestionRow[];
@@ -44,6 +45,8 @@ export interface CurriculumData {
   topicQuestionLinks: TopicFundamentalQuestionRow[];
   topicCompetencyLinks: TopicCompetencyRow[];
   masteryByCompetency: Map<string, MasteryAssessmentRow>;
+  /** Señales reales de aprendizaje por tema (sesiones, notas, validación, repaso) — ver learningState.ts. */
+  learningSignals: Map<string, TopicLearningSignals>;
   loading: boolean;
 }
 
@@ -62,6 +65,7 @@ export function useCurriculumData(): CurriculumData {
     topicQuestionLinks: [],
     topicCompetencyLinks: [],
     masteryByCompetency: new Map(),
+    learningSignals: new Map(),
   });
   const [loading, setLoading] = useState(true);
 
@@ -80,6 +84,7 @@ export function useCurriculumData(): CurriculumData {
       topicFundamentalQuestionsRepo.list(),
       topicCompetenciesRepo.list(),
       getLatestMasteryByCompetency(),
+      loadTopicLearningSignals(),
     ]).then(
       ([
         questions,
@@ -95,6 +100,7 @@ export function useCurriculumData(): CurriculumData {
         topicQuestionLinks,
         topicCompetencyLinks,
         masteryByCompetency,
+        learningSignals,
       ]) => {
         setData({
           questions,
@@ -110,6 +116,7 @@ export function useCurriculumData(): CurriculumData {
           topicQuestionLinks,
           topicCompetencyLinks,
           masteryByCompetency,
+          learningSignals,
         });
         setLoading(false);
       },

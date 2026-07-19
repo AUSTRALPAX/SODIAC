@@ -14,6 +14,8 @@ import {
   getBibliographyStats,
   getBlockDistribution,
   getBottlenecks,
+  getKnowledgeValidationStats,
+  getLearningStateDistribution,
   getMasteryEvolution,
   getReviewStats,
   getSessionActivity,
@@ -21,6 +23,8 @@ import {
   getXpEvolution,
   type BibliographyStats,
   type BlockDistribution,
+  type KnowledgeValidationStats,
+  type LearningStateDistributionEntry,
   type MasteryEvolutionPoint,
   type ReviewStats,
   type SessionActivityDay,
@@ -31,6 +35,21 @@ import {
 import { getLevelProgress, type LevelProgress } from "@/services/xp";
 import { getRankForLevel } from "@/services/ranks";
 import type { AcademicRankRow } from "@/database/types";
+
+const VERDICT_LABEL: Record<string, string> = {
+  revision_required: "Revisión necesaria",
+  basic: "Básico",
+  competent: "Competente",
+  advanced: "Avanzado",
+  outstanding: "Sobresaliente",
+};
+
+const LEARNING_STATE_TONE: Record<string, "danger" | "accent" | "success" | undefined> = {
+  enfriado: "danger",
+  validacion_pendiente: "accent",
+  validacion_aprobada: "success",
+  dominado: "success",
+};
 
 const AXIS_COLOR = "#6F7980";
 const GRID_COLOR = "#1D2328";
@@ -57,6 +76,8 @@ export function StatisticsPage() {
   const [levelProgress, setLevelProgress] = useState<LevelProgress | null>(null);
   const [rank, setRank] = useState<AcademicRankRow | null>(null);
   const [bibliography, setBibliography] = useState<BibliographyStats | null>(null);
+  const [validationStats, setValidationStats] = useState<KnowledgeValidationStats | null>(null);
+  const [learningStates, setLearningStates] = useState<LearningStateDistributionEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,7 +91,9 @@ export function StatisticsPage() {
       getSubjectCompletionRates(),
       getLevelProgress(),
       getBibliographyStats(),
-    ]).then(async ([a, m, r, b, bo, xp, cr, lp, bib]) => {
+      getKnowledgeValidationStats(),
+      getLearningStateDistribution(),
+    ]).then(async ([a, m, r, b, bo, xp, cr, lp, bib, val, states]) => {
       setActivity(a);
       setMastery(m);
       setReviewStats(r);
@@ -81,6 +104,8 @@ export function StatisticsPage() {
       setLevelProgress(lp);
       setRank(await getRankForLevel(lp.level));
       setBibliography(bib);
+      setValidationStats(val);
+      setLearningStates(states);
       setLoading(false);
     });
   }, []);
@@ -101,6 +126,44 @@ export function StatisticsPage() {
           <StatTile label="Pospuestos" value={reviewStats.pospuestos} />
           <StatTile label="Innecesarios" value={reviewStats.innecesarios} />
           <StatTile label="Enfriados" value={reviewStats.enfriados} />
+        </section>
+      )}
+
+      {learningStates.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            Distribución de estados de aprendizaje
+          </h2>
+          <p className="text-xs text-text-muted">Mismo estado que se ve en Carrera y en el Mapa, por tema.</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {learningStates.map((entry) => {
+              const tone = LEARNING_STATE_TONE[entry.state];
+              return <StatTile key={entry.state} label={entry.label} value={entry.count} {...(tone && { tone })} />;
+            })}
+          </div>
+        </section>
+      )}
+
+      {validationStats && (validationStats.totalAceptadas > 0 || validationStats.totalPendientes > 0) && (
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Validaciones de conocimiento</h2>
+          <p className="text-xs text-text-muted">Intentos de validación (Modo A/B) y sus veredictos aceptados.</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <StatTile label="Pendientes" value={validationStats.totalPendientes} tone="accent" />
+            {(Object.keys(VERDICT_LABEL) as Array<keyof typeof VERDICT_LABEL>)
+              .filter((verdict) => validationStats.byVerdict[verdict as keyof typeof validationStats.byVerdict] > 0)
+              .map((verdict) => {
+                const tone = verdict === "revision_required" ? "danger" : verdict === "outstanding" ? "success" : undefined;
+                return (
+                  <StatTile
+                    key={verdict}
+                    label={VERDICT_LABEL[verdict]!}
+                    value={validationStats.byVerdict[verdict as keyof typeof validationStats.byVerdict]}
+                    {...(tone && { tone })}
+                  />
+                );
+              })}
+          </div>
         </section>
       )}
 

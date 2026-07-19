@@ -2,6 +2,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { openNoteInObsidian } from "@/services/obsidian";
 import { TYPE_COLOR, TYPE_LABEL, type MapEntityType } from "./mapTypeColors";
 import type { CurriculumData } from "./useCurriculumData";
+import { computeTopicLearningState } from "@/services/learningState";
+import { TopicStateBadge } from "@/components/TopicStateBadge";
 
 export interface SelectedEntity {
   type: MapEntityType;
@@ -87,6 +89,16 @@ export function EntityDetailPanel({
             {TYPE_LABEL[entity.type]}
           </span>
           <h3 className="mt-2 font-display text-sm text-text-primary">{label ?? "(sin título)"}</h3>
+          {entity.type === "topic" && (
+            <div className="mt-1">
+              <TopicStateBadge
+                state={computeTopicLearningState({
+                  completedAt: subjectForCronograma?.completed_at ?? null,
+                  ...data.learningSignals.get(entity.id),
+                })}
+              />
+            </div>
+          )}
         </div>
         <button onClick={onClose} className="text-text-muted hover:text-text-primary">
           ✕

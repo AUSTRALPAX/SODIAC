@@ -1,6 +1,14 @@
 import { getDb } from "@/database/client";
 import { subjectsRepo, topicsRepo } from "@/database/entities";
 import { getLatestMasteryByCompetency } from "@/services/mastery";
+import { VALIDATION_WORK_TYPE } from "@/services/rubrics";
+import {
+  computeTopicLearningState,
+  loadTopicLearningSignals,
+  TOPIC_LEARNING_STATE_LABELS,
+  type TopicLearningState,
+} from "@/services/learningState";
+import type { EvaluationVerdict } from "@/database/types";
 
 export interface XpEvolutionPoint {
   day: string;
@@ -241,4 +249,80 @@ export async function getBibliographyStats(): Promise<BibliographyStats> {
     citedCount: usageByAction.get("citado") ?? 0,
     topAuthors: authors,
   };
+}
+
+export interface KnowledgeValidationStats {
+  totalAceptadas: number;
+  totalPendientes: number;
+  byVerdict: Record<EvaluationVerdict, number>;
+}
+
+/** Validaciones de conocimiento (fase 4/7): cuántas se aceptaron y con qué veredicto. */
+export async function getKnowledgeValidationStats(): Promise<KnowledgeValidationStats> {
+  const db = await getDb();
+  const [accepted, pending] = await Promise.all([
+    db.select<Array<{ verdict: EvaluationVerdict; count: number }>>(
+      `SELECT e.verdict as verdict, COUNT(*) as count
+       FROM academic_evaluation e
+       JOIN assignment_submission s ON s.id = e.submission_id
+       JOIN academic_assignment a ON a.id = s.assignment_id
+       WHERE a.work_type = ? AND e.status = 'aceptada'
+       GROUP BY e.verdict`,
+      [VALIDATION_WORK_TYPE],
+    ),
+    db.select<Array<{ count: number }>>(
+      `SELECT COUNT(*) as count FROM academic_assignment
+       WHERE work_type = ? AND archived_at IS NULL
+         AND status IN ('borrador','listo_para_evaluar','evaluacion_pendiente')`,
+      [VALIDATION_WORK_TYPE],
+    ),
+  ]);
+
+  const byVerdict: Record<EvaluationVerdict, number> = {
+    revision_required: 0,
+    basic: 0,
+    competent: 0,
+    advanced: 0,
+    outstanding: 0,
+  };
+  let totalAceptadas = 0;
+  for (const row of accepted) {
+    byVerdict[row.verdict] = row.count;
+    totalAceptadas += row.count;
+  }
+
+  return { totalAceptadas, totalPendientes: pending[0]?.count ?? 0, byVerdict };
+}
+
+export interface LearningStateDistributionEntry {
+  state: TopicLearningState;
+  label: string;
+  count: number;
+}
+
+/** Distribución de temas por el mismo estado de aprendizaje que se ve en Carrera/Mapa. */
+export async function getLearningStateDistribution(): Promise<LearningStateDistributionEntry[]> {
+  const [topics, signals] = await Promise.all([
+    topicsRepo.list({ where: "archived_at IS NULL" }),
+    loadTopicLearningSignals(),
+  ]);
+
+  const counts: Record<TopicLearningState, number> = {
+    pendiente: 0,
+    en_estudio: 0,
+    nota_consolidada: 0,
+    validacion_pendiente: 0,
+    validacion_aprobada: 0,
+    dominado: 0,
+    enfriado: 0,
+    reabierto: 0,
+  };
+  for (const topic of topics) {
+    const state = computeTopicLearningState({ completedAt: topic.completed_at, ...signals.get(topic.id) });
+    counts[state] += 1;
+  }
+
+  return (Object.keys(counts) as TopicLearningState[])
+    .filter((state) => counts[state] > 0)
+    .map((state) => ({ state, label: TOPIC_LEARNING_STATE_LABELS[state], count: counts[state] }));
 }
