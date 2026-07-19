@@ -25,6 +25,16 @@ import {
 import { DiagnosticItem } from "@/components/DiagnosticItem";
 import { exportAllAsJson, exportEntityAsCsv, EXPORTABLE_TABLES } from "@/services/export";
 import { importInstitutionalSeed, type SeedImportSummary } from "@/services/seedImport";
+import {
+  applyCurriculumImport,
+  parseCurriculumMarkdown,
+  previewCurriculumImport,
+  validateParsedCurriculum,
+  type CurriculumImportPreview,
+  type CurriculumImportResult,
+} from "@/services/curriculumImport";
+import type { CurriculumImportData } from "@/schemas/curriculumImport";
+import { registerCurriculumVersion } from "@/services/curriculumVersion";
 import { getVaultPath, listIndexedNotes } from "@/services/obsidian";
 import { enableSafeMode, isSafeModeEnabled } from "@/services/safeMode";
 import { WorkflowGuide } from "./WorkflowGuide";
@@ -66,6 +76,14 @@ export function SettingsPage() {
   const [seedBusy, setSeedBusy] = useState(false);
   const [seedResult, setSeedResult] = useState<SeedImportSummary | null>(null);
   const [seedError, setSeedError] = useState<string | null>(null);
+
+  const [curriculumMarkdownText, setCurriculumMarkdownText] = useState("");
+  const [curriculumFilePath, setCurriculumFilePath] = useState<string | null>(null);
+  const [curriculumData, setCurriculumData] = useState<CurriculumImportData | null>(null);
+  const [curriculumPreview, setCurriculumPreview] = useState<CurriculumImportPreview | null>(null);
+  const [curriculumResult, setCurriculumResult] = useState<CurriculumImportResult | null>(null);
+  const [curriculumBusy, setCurriculumBusy] = useState<"leyendo" | "aplicando" | null>(null);
+  const [curriculumError, setCurriculumError] = useState<string | null>(null);
 
   const [exportBusy, setExportBusy] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -222,6 +240,77 @@ export function SettingsPage() {
       setSeedError(String(error));
     } finally {
       setSeedBusy(false);
+    }
+  }
+
+  async function handleChooseCurriculumMarkdown() {
+    setCurriculumError(null);
+    setCurriculumResult(null);
+    setCurriculumPreview(null);
+    setCurriculumData(null);
+    setCurriculumBusy("leyendo");
+    try {
+      const picked = await openDialog({ multiple: false, filters: [{ name: "Markdown", extensions: ["md"] }] });
+      if (!picked || Array.isArray(picked)) return;
+      const text = await readTextFile(picked);
+      const raw = parseCurriculumMarkdown(text);
+      const validation = validateParsedCurriculum(raw);
+      if (!validation.valid || !validation.data) {
+        setCurriculumError(validation.errors.join(" · "));
+        return;
+      }
+      const preview = await previewCurriculumImport(validation.data);
+      setCurriculumFilePath(picked);
+      setCurriculumData(validation.data);
+      setCurriculumPreview(preview);
+    } catch (error) {
+      setCurriculumError(String(error));
+    } finally {
+      setCurriculumBusy(null);
+    }
+  }
+
+  async function handlePreviewCurriculumText() {
+    setCurriculumError(null);
+    setCurriculumResult(null);
+    setCurriculumPreview(null);
+    setCurriculumData(null);
+    setCurriculumFilePath(null);
+    setCurriculumBusy("leyendo");
+    try {
+      const raw = parseCurriculumMarkdown(curriculumMarkdownText);
+      const validation = validateParsedCurriculum(raw);
+      if (!validation.valid || !validation.data) {
+        setCurriculumError(validation.errors.join(" · "));
+        return;
+      }
+      const preview = await previewCurriculumImport(validation.data);
+      setCurriculumData(validation.data);
+      setCurriculumPreview(preview);
+    } catch (error) {
+      setCurriculumError(String(error));
+    } finally {
+      setCurriculumBusy(null);
+    }
+  }
+
+  async function handleApplyCurriculumImport() {
+    if (!curriculumData) return;
+    setCurriculumBusy("aplicando");
+    setCurriculumError(null);
+    try {
+      await createBackup("pre_importacion");
+      const version = await registerCurriculumVersion(
+        "Fase 2 — ampliación curricular",
+        curriculumFilePath ?? undefined,
+      );
+      const result = await applyCurriculumImport(curriculumData, curriculumFilePath, version.id);
+      setCurriculumResult(result);
+      await refreshBackups();
+    } catch (error) {
+      setCurriculumError(String(error));
+    } finally {
+      setCurriculumBusy(null);
     }
   }
 
@@ -453,6 +542,92 @@ export function SettingsPage() {
             <li>Proyectos: {seedResult.projects}</li>
             <li>Documentos: {seedResult.institutionalDocuments}</li>
             <li>Ya existían: {seedResult.skipped}</li>
+          </ul>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          Ampliación curricular (Markdown)
+        </h2>
+        <p className="mt-1 text-xs text-text-muted">
+          Elegí un documento Markdown con materias, unidades y temas nuevos. Las materias se
+          identifican por título — si el título ya existe, nunca se duplica, solo se cuelgan
+          unidades y temas nuevos debajo. Antes de aplicar se muestra una previsualización;
+          "Confirmar importación" crea un backup y registra una versión curricular nueva.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            disabled={curriculumBusy !== null}
+            onClick={handleChooseCurriculumMarkdown}
+            className="rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
+          >
+            {curriculumBusy === "leyendo" ? "Leyendo…" : "Elegir archivo Markdown…"}
+          </button>
+        </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs text-text-muted hover:text-text-secondary">
+            O pegar el Markdown directamente
+          </summary>
+          <textarea
+            value={curriculumMarkdownText}
+            onChange={(e) => setCurriculumMarkdownText(e.target.value)}
+            rows={6}
+            className="mt-2 w-full rounded border border-border bg-background p-2 font-mono text-xs text-text-primary focus:border-accent focus:outline-none"
+            placeholder="# Carrera&#10;version: ...&#10;### Materia: CODE|Título exacto ya existente&#10;#### Unidad: CODE|Título nuevo&#10;- Tema: CODE|Título nuevo"
+          />
+          <button
+            disabled={curriculumBusy !== null || !curriculumMarkdownText.trim()}
+            onClick={handlePreviewCurriculumText}
+            className="mt-2 rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
+          >
+            {curriculumBusy === "leyendo" ? "Leyendo…" : "Previsualizar texto pegado"}
+          </button>
+        </details>
+        {curriculumError && <p className="mt-2 text-xs text-danger">{curriculumError}</p>}
+        {curriculumPreview && (
+          <div className="mt-3 rounded border border-border-subtle bg-surface p-3 text-xs">
+            <p className="text-text-secondary">
+              {curriculumPreview.toCreate} a crear · {curriculumPreview.toUpdate} a actualizar ·{" "}
+              {curriculumPreview.unchanged} sin cambios
+            </p>
+            <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto">
+              {curriculumPreview.items.map((item, i) => (
+                <li key={i} className="flex items-center justify-between gap-2">
+                  <span className="text-text-muted">
+                    [{item.kind}] {item.label}
+                  </span>
+                  <span
+                    className={
+                      item.action === "crear" ? "text-accent" : item.action === "actualizar" ? "text-warning" : "text-text-muted"
+                    }
+                  >
+                    {item.action}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <button
+              disabled={curriculumBusy !== null}
+              onClick={handleApplyCurriculumImport}
+              className="mt-3 rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent disabled:opacity-50"
+            >
+              {curriculumBusy === "aplicando" ? "Aplicando…" : "Confirmar importación"}
+            </button>
+          </div>
+        )}
+        {curriculumResult && (
+          <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-text-secondary sm:grid-cols-3">
+            <li>Materias creadas: {curriculumResult.subjectsCreated}</li>
+            <li>Materias actualizadas: {curriculumResult.subjectsUpdated}</li>
+            <li>Unidades creadas: {curriculumResult.unitsCreated}</li>
+            <li>Temas creados: {curriculumResult.topicsCreated}</li>
+            <li>Actividades creadas: {curriculumResult.activitiesCreated}</li>
+            {curriculumResult.subjectsSkipped.length > 0 && (
+              <li className="col-span-full text-danger">
+                Omitidas: {curriculumResult.subjectsSkipped.join(" · ")}
+              </li>
+            )}
           </ul>
         )}
       </section>

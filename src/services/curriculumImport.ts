@@ -423,6 +423,8 @@ export interface CurriculumImportResult {
 export async function applyCurriculumImport(
   data: CurriculumImportData,
   sourceDocumentPath: string | null = null,
+  /** Se estampa solo en materias/temas efectivamente CREADOS en esta corrida — los que ya existían no se tocan. */
+  curriculumVersionId: string | null = null,
 ): Promise<CurriculumImportResult> {
   const result: CurriculumImportResult = {
     careerId: "",
@@ -533,6 +535,7 @@ export async function applyCurriculumImport(
         created_at: now(),
         updated_at: now(),
         archived_at: null,
+        curriculum_version_id: curriculumVersionId,
       };
       await subjectsRepo.insert(row);
       subjectsByTitle.set(key, row);
@@ -609,6 +612,7 @@ export async function applyCurriculumImport(
         created_at: now(),
         updated_at: now(),
         archived_at: null,
+        curriculum_version_id: curriculumVersionId,
       };
       await topicsRepo.insert(topic);
       topicByKey.set(key, topic);
