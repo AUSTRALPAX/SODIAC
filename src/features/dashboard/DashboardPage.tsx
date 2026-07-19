@@ -100,6 +100,7 @@ export function DashboardPage() {
   const [prefs, setPrefs] = useState<DashboardPrefs | null>(null);
   const [customizing, setCustomizing] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async (rangeDays: 30 | 90 | 365) => {
     const [ov, sum, hm, prog, act, blk, conf, sys, ag] = await Promise.all([
@@ -126,10 +127,17 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    void getDashboardPrefs().then(async (p) => {
-      setPrefs(p);
-      await refresh(p.rangeDays);
-    });
+    getDashboardPrefs()
+      .then(async (p) => {
+        setPrefs(p);
+        await refresh(p.rangeDays);
+      })
+      .catch((error) => {
+        console.error("[SODIAC] No se pudo cargar el Dashboard:", error);
+        setLoadError(
+          error instanceof Error ? error.message : "No se pudo cargar el Dashboard.",
+        );
+      });
     void Promise.all([subjectsRepo.list(), getSetting<boolean>(ONBOARDING_DISMISSED_KEY)]).then(
       ([subjects, dismissed]) => setShowOnboarding(subjects.length === 0 && !dismissed),
     );
@@ -179,6 +187,33 @@ export function DashboardPage() {
     () => (prefs ? prefs.order.filter((id) => !prefs.hidden.includes(id)) : []),
     [prefs],
   );
+
+  if (loadError) {
+    return (
+      <div className="p-10 text-sm">
+        <p className="text-danger">No se pudo cargar el Dashboard: {loadError}</p>
+        <button
+          type="button"
+          className="mt-4 rounded border border-border-subtle px-3 py-1.5 text-xs text-text-primary hover:bg-surface-hover"
+          onClick={() => {
+            setLoadError(null);
+            setLoading(true);
+            getDashboardPrefs()
+              .then(async (p) => {
+                setPrefs(p);
+                await refresh(p.rangeDays);
+              })
+              .catch((error) => {
+                console.error("[SODIAC] No se pudo cargar el Dashboard:", error);
+                setLoadError(error instanceof Error ? error.message : "No se pudo cargar el Dashboard.");
+              });
+          }}
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   if (loading || !prefs) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
 
