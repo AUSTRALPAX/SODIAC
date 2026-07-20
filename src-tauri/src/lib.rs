@@ -138,6 +138,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/0016_xp_rules_and_curriculum_version.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 17,
+            description: "xp_rules_recalibration",
+            sql: include_str!("../../migrations/0017_xp_rules_recalibration.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

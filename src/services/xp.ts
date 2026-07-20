@@ -4,22 +4,23 @@ import {
   xpEventsRepo,
 } from "@/database/entities";
 import type { CompletionXpCategory, SubjectRow, XpCategory, XpEventRow } from "@/database/types";
-import { ensureCurrentXpRulesVersion } from "@/services/xpRulesVersion";
+import {
+  ensureCurrentXpRulesVersion,
+  getResolvedXpRules,
+  xpRequiredForLevelWithRules,
+} from "@/services/xpRulesVersion";
 
 const now = () => new Date().toISOString();
 
 /**
- * Estas constantes siguen siendo la fuente de verdad operativa (todas las
- * funciones de este archivo son síncronas y muy usadas así en toda la app —
- * `AcademicSettingsTab`, `masterSchedule.ts`, tests). La fila `xp-rules-v1`
- * en `xp_rules_version` (ver `xpRulesVersion.ts`) es un snapshot EXACTO de
- * estos mismos valores, y cada `xp_event` nuevo queda taggeado con la
- * versión vigente — así que ya hay trazabilidad histórica real. La
- * recalibración (subir `CAREER_TOTAL_XP` sin bajar el nivel de nadie, vía
- * la curva por tramos que ya soporta `xpRulesVersion.ts`) se implementa en
- * la Fase 3, cuando además haya que convertir estas funciones a leer la
- * versión vigente en vivo — un cambio más grande, deliberado, no uno de
- * paso en esta fase de base.
+ * Estas constantes ya NO son la fuente de verdad en tiempo de ejecución —
+ * quedan exportadas solo como valores de referencia/documentación (y como
+ * seed de respaldo en `xpRulesVersion.ts`, que debe coincidir). Todas las
+ * funciones de este archivo leen la fila `is_current = 1` de
+ * `xp_rules_version` en vivo (vía `getResolvedXpRules()`), así que subir
+ * `CAREER_TOTAL_XP` (o cualquier otro peso) es una migración de datos, no
+ * un cambio de código — y la curva por tramos de `xpRequiredForLevelWithRules`
+ * ya soporta recalibrar sin bajarle el nivel a nadie el día que haga falta.
  */
 export const CAREER_TOTAL_XP = 100_000;
 export const MAX_LEVEL = 100;
@@ -95,15 +96,16 @@ export function scoreMultiplier(score100: number): number {
  * paso manual — y sin tocar los eventos de XP ya otorgados, que son
  * inmutables (solo cambia cuánto se otorga a partir de ahora).
  */
-export function computeSubjectBudgetShare(
+export async function computeSubjectBudgetShare(
   subject: SubjectRow,
   activeSubjects: SubjectRow[],
-): { graded: number; completion: number } {
+): Promise<{ graded: number; completion: number }> {
+  const rules = await getResolvedXpRules();
   const totalCredits = activeSubjects.reduce((sum, s) => sum + s.credits, 0) || 1;
   const share = subject.credits / totalCredits;
   return {
-    graded: CAREER_TOTAL_XP * GRADED_SHARE * share,
-    completion: CAREER_TOTAL_XP * COMPLETION_SHARE * share,
+    graded: rules.careerTotalXp * rules.gradedShare * share,
+    completion: rules.careerTotalXp * rules.completionShare * share,
   };
 }
 
@@ -122,19 +124,21 @@ export async function listSubjectXpBudgets(): Promise<SubjectXpBudgetView[]> {
   const subjects = await subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" });
   const events = await xpEventsRepo.list();
 
-  return subjects.map((s) => {
-    const { graded, completion } = computeSubjectBudgetShare(s, subjects);
-    const earnedXp = events.filter((e) => e.subject_id === s.id).reduce((sum, e) => sum + e.amount, 0);
-    return {
-      subjectId: s.id,
-      title: s.title,
-      credits: s.credits,
-      gradedBudget: Math.round(graded),
-      completionBudget: Math.round(completion),
-      totalBudget: Math.round(graded + completion),
-      earnedXp,
-    };
-  });
+  return Promise.all(
+    subjects.map(async (s) => {
+      const { graded, completion } = await computeSubjectBudgetShare(s, subjects);
+      const earnedXp = events.filter((e) => e.subject_id === s.id).reduce((sum, e) => sum + e.amount, 0);
+      return {
+        subjectId: s.id,
+        title: s.title,
+        credits: s.credits,
+        gradedBudget: Math.round(graded),
+        completionBudget: Math.round(completion),
+        totalBudget: Math.round(graded + completion),
+        earnedXp,
+      };
+    }),
+  );
 }
 
 /** Presupuesto vigente de una materia puntual — mismo cálculo que usa `awardXp`. */
@@ -142,16 +146,17 @@ export async function getSubjectXpBudgetTotal(subjectId: string): Promise<{ grad
   const subjects = await subjectsRepo.list({ where: "archived_at IS NULL" });
   const subject = subjects.find((s) => s.id === subjectId);
   if (!subject) return { graded: 0, completion: 0, total: 0 };
-  const { graded, completion } = computeSubjectBudgetShare(subject, subjects);
+  const { graded, completion } = await computeSubjectBudgetShare(subject, subjects);
   return { graded, completion, total: graded + completion };
 }
 
-function categoryBudgetForSubject(subject: SubjectRow, activeSubjects: SubjectRow[], category: XpCategory): number {
-  const { graded, completion } = computeSubjectBudgetShare(subject, activeSubjects);
+async function categoryBudgetForSubject(subject: SubjectRow, activeSubjects: SubjectRow[], category: XpCategory): Promise<number> {
+  const rules = await getResolvedXpRules();
+  const { graded, completion } = await computeSubjectBudgetShare(subject, activeSubjects);
   if (isCompletionCategory(category)) {
-    return completion * COMPLETION_CATEGORY_WEIGHTS[category];
+    return completion * rules.completionCategoryWeights[category];
   }
-  return graded * CATEGORY_WEIGHTS[category];
+  return graded * rules.categoryWeights[category];
 }
 
 export interface AwardXpInput {
@@ -201,7 +206,7 @@ async function computeXpPreview(input: AwardXpInput): Promise<{
     const activeSubjects = await subjectsRepo.list({ where: "archived_at IS NULL" });
     const subject = activeSubjects.find((s) => s.id === input.subjectId);
     if (subject) {
-      const categoryBudget = categoryBudgetForSubject(subject, activeSubjects, input.category);
+      const categoryBudget = await categoryBudgetForSubject(subject, activeSubjects, input.category);
       const items = Math.max(1, input.itemsSharingCategory ?? 1);
       proposedAmount = (categoryBudget / items) * multiplier;
     }
@@ -295,24 +300,25 @@ export async function listXpHistory(limit = 50): Promise<XpEventRow[]> {
 }
 
 /**
- * Curva de nivel no lineal (prompt maestro §16):
- * XP_requerido(nivel) = round(100000 * (nivel/100)^1.55)
- * Los primeros niveles avanzan rápido; los últimos exigen mucha más evidencia.
+ * Curva de nivel no lineal (prompt maestro §16), leída en vivo desde
+ * `xp_rules_version` — ver `xpRequiredForLevelWithRules` en `xpRulesVersion.ts`
+ * para la curva por tramos que soporta recalibrar sin bajar a nadie de nivel.
  */
-export function xpRequiredForLevel(level: number): number {
-  if (level <= 0) return 0;
-  return Math.round(CAREER_TOTAL_XP * Math.pow(level / MAX_LEVEL, 1.55));
+export async function xpRequiredForLevel(level: number): Promise<number> {
+  const rules = await getResolvedXpRules();
+  return xpRequiredForLevelWithRules(level, rules);
 }
 
-export function levelFromXp(xpTotal: number): number {
+export async function levelFromXp(xpTotal: number): Promise<number> {
   if (xpTotal <= 0) return 0;
-  if (xpTotal >= CAREER_TOTAL_XP) return MAX_LEVEL;
+  const rules = await getResolvedXpRules();
+  if (xpTotal >= rules.careerTotalXp) return rules.maxLevel;
   // La curva es monótona creciente: se puede invertir en forma cerrada y luego
-  // ajustar por redondeo comparando contra xpRequiredForLevel.
-  const estimated = MAX_LEVEL * Math.pow(xpTotal / CAREER_TOTAL_XP, 1 / 1.55);
+  // ajustar por redondeo comparando contra xpRequiredForLevelWithRules.
+  const estimated = rules.maxLevel * Math.pow(xpTotal / rules.careerTotalXp, 1 / rules.levelCurveExponent);
   let level = Math.floor(estimated);
-  while (level < MAX_LEVEL && xpRequiredForLevel(level + 1) <= xpTotal) level++;
-  while (level > 0 && xpRequiredForLevel(level) > xpTotal) level--;
+  while (level < rules.maxLevel && xpRequiredForLevelWithRules(level + 1, rules) <= xpTotal) level++;
+  while (level > 0 && xpRequiredForLevelWithRules(level, rules) > xpTotal) level--;
   return level;
 }
 
@@ -328,9 +334,10 @@ export interface LevelProgress {
 
 export async function getLevelProgress(): Promise<LevelProgress> {
   const xpTotal = await getCareerXpTotal();
-  const level = levelFromXp(xpTotal);
-  const xpForCurrentLevel = xpRequiredForLevel(level);
-  const xpForNextLevel = level < MAX_LEVEL ? xpRequiredForLevel(level + 1) : null;
+  const rules = await getResolvedXpRules();
+  const level = await levelFromXp(xpTotal);
+  const xpForCurrentLevel = await xpRequiredForLevel(level);
+  const xpForNextLevel = level < rules.maxLevel ? await xpRequiredForLevel(level + 1) : null;
   const xpIntoLevel = xpTotal - xpForCurrentLevel;
   const xpNeededForNextLevel = xpForNextLevel != null ? xpForNextLevel - xpTotal : null;
   const levelSpan = xpForNextLevel != null ? xpForNextLevel - xpForCurrentLevel : 1;
@@ -370,5 +377,6 @@ export async function isLevel100XpEligible(): Promise<boolean> {
   const events = await xpEventsRepo.list();
   const total = events.reduce((sum, e) => sum + e.amount, 0);
   const attemptTotal = events.filter((e) => e.category === "intento").reduce((sum, e) => sum + e.amount, 0);
-  return total >= CAREER_TOTAL_XP && attemptTotal < total * 0.5;
+  const rules = await getResolvedXpRules();
+  return total >= rules.careerTotalXp && attemptTotal < total * 0.5;
 }

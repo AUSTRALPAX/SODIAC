@@ -18,7 +18,8 @@
  */
 import { obsidianNotesRepo } from "@/database/entities";
 import { getInProgressSession } from "@/services/sessions";
-import { computeSubjectBudgetShare, COMPLETION_CATEGORY_WEIGHTS } from "@/services/xp";
+import { computeSubjectBudgetShare } from "@/services/xp";
+import { getResolvedXpRules } from "@/services/xpRulesVersion";
 import type {
   BibliographicSourceRow,
   CompetencyRow,
@@ -214,16 +215,17 @@ export async function buildMasterSchedule(input: BuildMasterScheduleInput): Prom
   const steps: ScheduleStep[] = [];
   let globalIndex = 0;
   let firstIncompleteAssigned = false;
+  const rules = await getResolvedXpRules();
 
   for (const subject of sortedSubjects) {
     const topics = topicsBySubject.get(subject.id) ?? [];
     if (topics.length === 0) continue;
 
-    const { completion } = computeSubjectBudgetShare(subject, activeSubjects);
+    const { completion } = await computeSubjectBudgetShare(subject, activeSubjects);
     // XP total potencial del tema — se obtiene completándolo (finalizacion_tema) más
     // validando el conocimiento (validacion_conocimiento); juntos suman lo mismo que
     // antes de dividir la categoría en dos.
-    const topicShare = COMPLETION_CATEGORY_WEIGHTS.finalizacion_tema + COMPLETION_CATEGORY_WEIGHTS.validacion_conocimiento;
+    const topicShare = rules.completionCategoryWeights.finalizacion_tema + rules.completionCategoryWeights.validacion_conocimiento;
     const xpPerTopic = (completion * topicShare) / topics.length;
 
     const etapa = subject.external_ref

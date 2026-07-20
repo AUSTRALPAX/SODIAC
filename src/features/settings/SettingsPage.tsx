@@ -623,6 +623,7 @@ export function SettingsPage() {
             <li>Unidades creadas: {curriculumResult.unitsCreated}</li>
             <li>Temas creados: {curriculumResult.topicsCreated}</li>
             <li>Actividades creadas: {curriculumResult.activitiesCreated}</li>
+            <li>Créditos recalculados: {curriculumResult.creditsRecalculated}</li>
             {curriculumResult.subjectsSkipped.length > 0 && (
               <li className="col-span-full text-danger">
                 Omitidas: {curriculumResult.subjectsSkipped.join(" · ")}

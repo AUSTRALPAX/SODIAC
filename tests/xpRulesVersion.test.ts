@@ -72,6 +72,46 @@ describe("xpRequiredForLevelWithRules — misma curva que xp.ts hoy (sin congela
   });
 });
 
+describe("getResolvedXpRules — refleja la fila vigente en vivo (Fase 3)", () => {
+  it("si la fila is_current tiene un career_total_xp recalibrado, se lee ese valor sin caché", async () => {
+    xpRulesVersions = makeMemoryRepo<XpRulesVersionRow>([
+      {
+        id: "xp-rules-v1",
+        label: "Reglas de XP fundacionales",
+        career_total_xp: 112600,
+        max_level: 100,
+        level_curve_exponent: 1.55,
+        graded_share: 0.7,
+        completion_share: 0.3,
+        category_weights_json: JSON.stringify({
+          notas_conceptuales: 0.10,
+          ejercicios_practicas: 0.20,
+          aplicaciones_casos: 0.25,
+          proyecto_examen_integrador: 0.30,
+          hitos_dominio: 0.10,
+          revision_diferida_retencion: 0.05,
+          intento: 0,
+        }),
+        completion_category_weights_json: JSON.stringify({
+          finalizacion_tarea_hito: 0.20,
+          finalizacion_tema: 0.36,
+          validacion_conocimiento: 0.24,
+          cierre_materia: 0.20,
+        }),
+        frozen_at_level: null,
+        frozen_at_xp: null,
+        is_current: 1,
+        created_at: "2026-01-01T00:00:00.000Z",
+        updated_at: "2026-07-19T00:00:00.000Z",
+        notes: null,
+      },
+    ]);
+    const rules = await getResolvedXpRules();
+    expect(rules.careerTotalXp).toBe(112600);
+    expect(xpRequiredForLevelWithRules(100, rules)).toBe(112600);
+  });
+});
+
 describe("xpRequiredForLevelWithRules — curva por tramos (para la recalibración de Fase 3)", () => {
   it("con un punto de congelamiento, los niveles ya alcanzados no cambian", async () => {
     const rules = {

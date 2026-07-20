@@ -13,8 +13,9 @@ import { ExperienceTab } from "./tabs/ExperienceTab";
 import { RanksTab } from "./tabs/RanksTab";
 import { SubjectsProgressTab } from "./tabs/SubjectsProgressTab";
 import { AcademicSettingsTab } from "./tabs/AcademicSettingsTab";
+import { AttributesTab } from "./tabs/AttributesTab";
 
-type TabId = "resumen" | "expediente" | "calificaciones" | "experiencia" | "niveles" | "materias" | "configuracion";
+type TabId = "resumen" | "expediente" | "calificaciones" | "experiencia" | "niveles" | "materias" | "atributos" | "configuracion";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "resumen", label: "Resumen" },
@@ -23,6 +24,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "experiencia", label: "Experiencia" },
   { id: "niveles", label: "Niveles y rangos" },
   { id: "materias", label: "Progreso de materias" },
+  { id: "atributos", label: "Atributos" },
   { id: "configuracion", label: "Configuración académica" },
 ];
 
@@ -109,6 +111,7 @@ export function TrajectoryPage() {
         {tab === "experiencia" && <ExperienceTab />}
         {tab === "niveles" && <RanksTab currentLevel={levelProgress.level} onChanged={refreshHeader} />}
         {tab === "materias" && <SubjectsProgressTab />}
+        {tab === "atributos" && <AttributesTab />}
         {tab === "configuracion" && <AcademicSettingsTab onChanged={refreshHeader} />}
       </div>
     </div>

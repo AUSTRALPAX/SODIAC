@@ -10,9 +10,44 @@ import type {
 let mockNotes: Partial<ObsidianNoteRow>[] = [];
 let mockInProgressSession: { topic_id: string | null } | null = null;
 
+const mockXpRulesVersion = {
+  id: "xp-rules-v1",
+  label: "Reglas de XP fundacionales",
+  career_total_xp: 100000,
+  max_level: 100,
+  level_curve_exponent: 1.55,
+  graded_share: 0.7,
+  completion_share: 0.3,
+  category_weights_json: JSON.stringify({
+    notas_conceptuales: 0.10,
+    ejercicios_practicas: 0.20,
+    aplicaciones_casos: 0.25,
+    proyecto_examen_integrador: 0.30,
+    hitos_dominio: 0.10,
+    revision_diferida_retencion: 0.05,
+    intento: 0,
+  }),
+  completion_category_weights_json: JSON.stringify({
+    finalizacion_tarea_hito: 0.20,
+    finalizacion_tema: 0.36,
+    validacion_conocimiento: 0.24,
+    cierre_materia: 0.20,
+  }),
+  frozen_at_level: null,
+  frozen_at_xp: null,
+  is_current: 1,
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+  notes: null,
+};
+
 vi.mock("@/database/entities", () => ({
   obsidianNotesRepo: {
     list: async () => mockNotes,
+  },
+  xpRulesVersionsRepo: {
+    list: async () => [mockXpRulesVersion],
+    insert: async (row: unknown) => row,
   },
 }));
 vi.mock("@/services/sessions", () => ({

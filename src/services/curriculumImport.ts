@@ -13,6 +13,7 @@ import {
   type CurriculumImportData,
   type CurriculumImportValidationResult,
 } from "@/schemas/curriculumImport";
+import { recalculateSubjectCredits } from "@/services/curriculumReconciliation";
 
 const now = () => new Date().toISOString();
 
@@ -418,6 +419,7 @@ export interface CurriculumImportResult {
   unitsCreated: number;
   topicsCreated: number;
   activitiesCreated: number;
+  creditsRecalculated: number;
 }
 
 export async function applyCurriculumImport(
@@ -435,6 +437,7 @@ export async function applyCurriculumImport(
     unitsCreated: 0,
     topicsCreated: 0,
     activitiesCreated: 0,
+    creditsRecalculated: 0,
   };
 
   // Career: una fila por (título, versión) — reimportar el mismo documento no duplica.
@@ -651,6 +654,12 @@ export async function applyCurriculumImport(
     activityKeys.add(key);
     result.activitiesCreated++;
   }
+
+  // Los créditos (1-5) se normalizan por cantidad de temas de cada materia —
+  // si esta corrida creó temas nuevos en materias existentes, sus créditos
+  // podrían haber quedado desactualizados. Recalcular sobre TODAS las
+  // materias activas mantiene el reparto de XP por materia consistente.
+  result.creditsRecalculated = await recalculateSubjectCredits();
 
   return result;
 }

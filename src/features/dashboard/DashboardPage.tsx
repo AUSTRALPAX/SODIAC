@@ -40,6 +40,7 @@ import {
 } from "@/services/dashboard";
 import { getBlockDistribution, getSessionActivity, type BlockDistribution, type SessionActivityDay } from "@/services/statistics";
 import { MASTERY_LEVEL_COLOR, MASTERY_LEVEL_LABEL } from "@/services/mastery";
+import { computeAttributeScores, type AttributeScore } from "@/services/attributes";
 import { getLevelProgress, type LevelProgress } from "@/services/xp";
 import { getNextRank, getRankForLevel } from "@/services/ranks";
 import { computeIpa } from "@/services/progress";
@@ -66,6 +67,7 @@ const WIDGET_LABEL: Record<DashboardWidgetId, string> = {
   temporal: "Estadísticas temporales",
   sistema: "Estado del sistema",
   agenda: "Agenda general",
+  atributos: "Atributos académicos",
 };
 
 function formatDay(day: string): string {
@@ -355,6 +357,8 @@ export function DashboardPage() {
               return systemStatus && <SystemStatusSection key={id} status={systemStatus} />;
             case "agenda":
               return <AgendaSection key={id} items={agenda} />;
+            case "atributos":
+              return <AttributesSection key={id} />;
             default:
               return null;
           }
@@ -652,6 +656,49 @@ function TrayectoriaSection() {
           Ver carrera
         </Link>
       </div>
+    </section>
+  );
+}
+
+function AttributesSection() {
+  const [scores, setScores] = useState<AttributeScore[]>([]);
+
+  useEffect(() => {
+    void computeAttributeScores().then(setScores);
+  }, []);
+
+  const withData = scores.filter((s) => s.weightedMasteryLevel != null);
+  const topThree = [...withData].sort((a, b) => (b.weightedMasteryLevel ?? 0) - (a.weightedMasteryLevel ?? 0)).slice(0, 3);
+
+  return (
+    <section className="rounded border border-border-subtle bg-surface p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          En qué te estás convirtiendo
+        </h2>
+        <Link to="/trajectory" className="text-xs text-accent hover:underline">
+          Ver todos →
+        </Link>
+      </div>
+      {topThree.length === 0 ? (
+        <p className="mt-3 text-xs text-text-muted">
+          Todavía no hay temas evaluados con atributos académicos asignados.
+        </p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {topThree.map((s) => (
+            <li key={s.attributeId} className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-text-primary">{s.name}</span>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-background">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${s.percentOf5 ?? 0}%` }} />
+                </div>
+                <span className="w-10 text-right text-xs text-text-muted">{(s.weightedMasteryLevel ?? 0).toFixed(1)}/5</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
