@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { SodiacLogo } from "@/components/brand/SodiacLogo";
-import { NAV_ITEMS } from "./navigation";
+import { NAV_GROUPS } from "./navGroups";
 import { CommandPalette } from "./CommandPalette";
 import { SessionRecoveryBanner } from "@/features/sessions/SessionRecoveryBanner";
 
@@ -17,23 +17,32 @@ export function AppShell() {
             SODIAC
           </span>
         </div>
-        <nav className="flex-1 space-y-0.5 px-2">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.path === "/"}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded px-3 py-2 text-sm transition-colors ${
-                  isActive
-                    ? "bg-surface-elevated text-text-primary"
-                    : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                }`
-              }
-            >
-              <item.icon size={16} strokeWidth={1.75} />
-              {item.label}
-            </NavLink>
+        <nav className="flex-1 overflow-y-auto px-2 pb-2">
+          {NAV_GROUPS.map((group, index) => (
+            <div key={group.label} className={index === 0 ? "" : "mt-3 border-t border-border-subtle pt-3"}>
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === "/"}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded px-3 py-2 text-sm transition-colors ${
+                        isActive
+                          ? "bg-surface-elevated text-text-primary"
+                          : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                      }`
+                    }
+                  >
+                    <item.icon size={16} strokeWidth={1.75} />
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
         <div className="border-t border-border-subtle px-3 py-3 text-xs text-text-muted">

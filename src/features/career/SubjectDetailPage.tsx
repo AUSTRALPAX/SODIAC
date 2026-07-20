@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import {
   academicTranscriptEntriesRepo,
   bibliographicSourcesRepo,
@@ -145,9 +146,7 @@ export function SubjectDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-10">
-      <Link to="/carrera" className="text-sm text-text-secondary hover:text-accent">
-        ← Carrera
-      </Link>
+      <Breadcrumb items={[{ label: "Carrera", to: "/carrera" }, { label: subject.title }]} />
 
       <div>
         <p className="text-xs uppercase tracking-wide text-text-muted">{stage?.title ?? "Sin etapa"}</p>

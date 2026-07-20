@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import {
   obsidianNotesRepo,
   studyBlocksRepo,
@@ -416,9 +417,9 @@ export function ActiveSessionPage() {
   if (session.closure_status !== "en_curso") {
     return (
       <div className="mx-auto max-w-2xl p-10">
-        <Link to="/sesiones" className="text-sm text-text-secondary hover:text-accent">
-          ← Sesiones
-        </Link>
+        <Breadcrumb
+          items={[{ label: "Sesiones", to: "/sesiones" }, { label: subject?.title ?? topic?.title ?? "Sesión" }]}
+        />
         <h1 className="mt-3 font-display text-2xl">{session.observable_objective}</h1>
         <p className="mt-1 text-sm text-text-muted">
           Estado: {session.closure_status} · {session.started_at && new Date(session.started_at).toLocaleString("es-AR")}
@@ -435,6 +436,9 @@ export function ActiveSessionPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-10">
+      <Breadcrumb
+        items={[{ label: "Sesiones", to: "/sesiones" }, { label: subject?.title ?? topic?.title ?? "Sesión activa" }]}
+      />
       <div>
         <p className="text-xs uppercase tracking-wide text-text-muted">
           {[topic?.title, competency?.title].filter(Boolean).join(" · ") || "Sin ubicar en el mapa"}

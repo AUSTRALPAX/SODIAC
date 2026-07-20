@@ -389,7 +389,7 @@ export function RelationsView({ data }: { data: CurriculumData }) {
                 setSearch(e.target.value);
                 if (searchParams.get("buscar")) setSearchParams({}, { replace: true });
               }}
-              placeholder="Buscar entre los 492 temas…"
+              placeholder={`Buscar entre los ${data.topics.length} temas…`}
               className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
             />
             {searchLower && (

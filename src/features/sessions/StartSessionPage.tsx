@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import {
   competenciesRepo,
   fundamentalQuestionsRepo,
@@ -177,7 +178,8 @@ export function StartSessionPage() {
 
   return (
     <div className="mx-auto max-w-2xl p-10">
-      <h1 className="font-display text-2xl">Iniciar estudio</h1>
+      <Breadcrumb items={[{ label: "Sesiones", to: "/sesiones" }, { label: "Iniciar estudio" }]} />
+      <h1 className="mt-3 font-display text-2xl">Iniciar estudio</h1>
       <p className="mt-1 text-sm text-text-secondary">
         Protocolo INICIAR ESTUDIO — ubica la sesión en el sistema antes de empezar.
       </p>
