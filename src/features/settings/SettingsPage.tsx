@@ -24,6 +24,7 @@ import {
 } from "@/services/backup";
 import { DiagnosticItem } from "@/components/DiagnosticItem";
 import { exportAllAsJson, exportEntityAsCsv, EXPORTABLE_TABLES } from "@/services/export";
+import { exportAcademicMarkdown } from "@/services/aiContextExport";
 import { importInstitutionalSeed, type SeedImportSummary } from "@/services/seedImport";
 import {
   applyCurriculumImport,
@@ -340,6 +341,19 @@ export function SettingsPage() {
     }
   }
 
+  async function handleExportAcademicMarkdown() {
+    setExportBusy("markdown");
+    setExportMessage(null);
+    try {
+      const result = await exportAcademicMarkdown();
+      setExportMessage(result ? `Exportado a ${result.path}` : "Exportación cancelada.");
+    } catch (error) {
+      setExportMessage(`Error al exportar: ${String(error)}`);
+    } finally {
+      setExportBusy(null);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl p-10">
       <h1 className="font-display text-2xl">Configuración</h1>
@@ -645,6 +659,13 @@ export function SettingsPage() {
           >
             {exportBusy === "json" ? "Exportando…" : "Todo (JSON)"}
           </button>
+          <button
+            disabled={exportBusy !== null}
+            onClick={handleExportAcademicMarkdown}
+            className="rounded border border-border px-3 py-1.5 text-xs text-text-secondary hover:border-accent hover:text-accent disabled:opacity-50"
+          >
+            {exportBusy === "markdown" ? "Exportando…" : "Contenidos académicos (Markdown)"}
+          </button>
           {EXPORTABLE_TABLES.map((table) => (
             <button
               key={table}
@@ -658,8 +679,8 @@ export function SettingsPage() {
         </div>
         {exportMessage && <p className="mt-2 text-xs text-text-secondary">{exportMessage}</p>}
         <p className="mt-2 text-xs text-text-muted">
-          Markdown para contenidos académicos y el paquete comprimido con manifiesto se agregan
-          en Fase 4 y en cuanto exista contenido de sesiones para exportar.
+          El paquete comprimido (base SQLite + configuración + manifiesto, para portabilidad o
+          migración) queda pendiente para una fase futura.
         </p>
       </section>
     </div>
