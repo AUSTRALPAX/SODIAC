@@ -27,7 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Carrera", path: "/carrera", icon: GraduationCap },
   { label: "Mapa", path: "/mapa", icon: Network },
   { label: "Sesiones", path: "/sesiones", icon: BookOpen },
-  { label: "Planificación", path: "/planificacion", icon: Calendar },
+  { label: "Ritmo y continuidad", path: "/planificacion", icon: Calendar },
   { label: "Repasos", path: "/repasos", icon: RotateCcw },
   { label: "Proyectos", path: "/proyectos", icon: FolderKanban },
   { label: "Biblioteca", path: "/biblioteca", icon: Library },
