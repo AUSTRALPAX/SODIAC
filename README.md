@@ -4,6 +4,13 @@ Sistema operativo académico y centro de estudio del Instituto de Asignación de
 Creación de Valor y Pensamiento Sistémico (IAC). Aplicación de escritorio local-first para
 Windows (Tauri 2 + React + TypeScript + SQLite).
 
+Acompaña el recorrido completo de una carrera propia: currículo (materias, unidades,
+temas y sus dependencias), sesiones de estudio con evidencia y cierre formal, un sistema
+de XP y niveles que crece con el trabajo real, mapa de relaciones curriculares, repasos
+espaciados, biblioteca bibliográfica vinculada al currículo, proyectos, documentos
+versionados y sincronización bidireccional con un vault de Obsidian — todo corriendo
+en una base SQLite local, sin depender de ningún servicio en la nube.
+
 Documentación completa en [`docs/`](docs/):
 - [PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) — qué es SODIAC y alcance del MVP.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — stack, capas, puerto de desarrollo.
@@ -53,4 +60,8 @@ Genera el instalador de Windows en `src-tauri/target/release/bundle/`. Ver
 
 ## Estado
 
-Fases 0 a 10 completas (ver `docs/ROADMAP.md` y `CHANGELOG.md`).
+v1.15.0. Fases 0 a 10 del desarrollo original completas, más un ciclo posterior de
+"mejora integral" (versionado de reglas de XP/currículo, ampliación curricular,
+navegación y búsqueda global, ritmo y continuidad de estudio, y exportación de
+contenidos académicos en Markdown) — ver `docs/ROADMAP.md` y `CHANGELOG.md` para el
+detalle fase por fase.
