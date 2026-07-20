@@ -2,6 +2,73 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.12.0]–[1.15.0] — Mejora integral (fases 1 a 7)
+
+Ciclo de mejora sobre la base ya existente: sin reconstruir nada desde cero, sin
+eliminar información ni reducir el nivel/XP de ningún usuario durante las migraciones.
+
+### Fase 1 — v1.12.0: base de la mejora integral
+- Migración `0016` (aditiva): tablas `xp_rules_version` y `curriculum_version` para
+  poder versionar las reglas de XP y las importaciones curriculares en vez de tenerlas
+  hardcodeadas, más columnas de atributos académicos.
+- `xpRulesVersion.ts`: reglas de XP resueltas en vivo desde la base en lugar de
+  constantes fijas en el código.
+- `curriculumVersion.ts` y extensión de `curriculumReconciliation.ts` para asociar cada
+  importación curricular a una versión trazable.
+
+### Fase 2 — v1.12.1–1.12.3: ampliación curricular
+- Importación de 9 unidades y 62 temas nuevos al currículo (`applyCurriculumImport`
+  extendido con `curriculumVersionId`), con `target_mastery_level` y
+  `topic_attribute_weight` asignados a cada tema nuevo desde el arranque.
+
+### Fase 3 — v1.13.0–1.13.1: recalibración de XP + atributos académicos
+- `xp.ts` convertido a async, leyendo las reglas de XP en vivo (`getResolvedXpRules()`)
+  en vez de cachearlas; `CAREER_TOTAL_XP` recalibrado a 112.600 proporcional al
+  crecimiento de temas (554/492).
+- Purga de 29 filas de `academic_level_history` que eran datos de prueba de
+  desarrollo — corregía un bug real: con una fila de nivel 28 falsa presente, un
+  usuario real llegando a los niveles 1–27 nunca quedaba registrado.
+- `recalculateSubjectCredits()` conectado a `applyCurriculumImport` (antes solo se
+  disparaba desde el importador viejo, dejando los créditos desactualizados tras
+  cualquier import nuevo).
+- Atributos académicos visibles: `attributes.ts` (`computeAttributeScores()`) con
+  cobertura reportada explícitamente (temas evaluados vs. clasificados, nunca se
+  finge cobertura completa) — nueva pestaña "Atributos" en Trayectoria (radar) y
+  widget en el Dashboard.
+
+### Fase 4 — v1.14.0: navegación agrupada + búsqueda global real
+- Sidebar reorganizado en 6 grupos temáticos sobre las mismas 13 secciones.
+- `globalSearch.ts`: búsqueda real sobre materias y temas (antes la paleta de
+  comandos Ctrl+K solo filtraba los ítems de navegación visibles).
+- Breadcrumbs en detalle de materia, iniciar sesión y sesión activa.
+
+### Fase 5 — v1.14.1–1.14.2: Ritmo y continuidad
+- "Planificación" pasa a ser "Ritmo y continuidad": racha de estudio (actual y más
+  larga, mismo cálculo que el heatmap de actividad) y puntos de continuidad —
+  este último dato ya se guardaba en cada cierre de sesión pero nunca se mostraba
+  en ningún lado.
+- Corregido un bug de zona horaria (mismo patrón ya documentado en
+  `src/utils/date.ts`): una fecha `YYYY-MM-DD` parseada sin ancla horaria se
+  interpretaba como UTC y mostraba un día menos en Argentina (UTC-3).
+
+### Fase 6 — v1.15.0: exportación de contenidos académicos
+- `aiContextExport.ts`: exportación en Markdown de todas las sesiones de estudio con
+  su evidencia, notas de Obsidian vinculadas y bibliografía de la materia — pensada
+  para pegar en herramientas de IA (NotebookLM, ChatGPT) como paquete de contexto.
+  El paquete comprimido de portabilidad (base + configuración) queda fuera de esta
+  fase, documentado como pendiente.
+
+### Fase 7 — pruebas y reporte final (sin cambios de código)
+- Batería completa de regresión (typecheck, lint, tests, `cargo check`/`cargo test`)
+  y recorrido en vivo por las 13 secciones y flujos clave vía CDP.
+- Panel de Integridad académica y bibliográfica revisado: 0 referencias rotas, 0
+  ciclos de dependencia, 0 catálogos duplicados, 0 vínculos huérfanos.
+- Hallazgo documentado (no introducido por esta mejora, preexistente desde las fases
+  BIB-*): la Biblioteca renderiza, por cada recurso, varios `<select>` de vinculación
+  con la lista completa de materias/temas sin virtualizar (~93.000 elementos `<option>`
+  para 150 recursos) — no rompe nada hoy, queda pendiente para una fase futura
+  dedicada a Biblioteca.
+
 ## [1.1.0] — Dashboard, Sesiones, Biblioteca, Documentos y Obsidian
 
 - **Dashboard** (antes "Hoy", ahora en `/dashboard` con redirección desde `/` y `/today`):
