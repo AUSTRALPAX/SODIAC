@@ -2,6 +2,21 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.16.1] — Corrección: Ritmo y continuidad no se quería sacar
+
+La v1.16.0 interpretó mal el pedido del usuario: lo que sobraba no era
+"Racha de estudio"/"Puntos de continuidad" sino el gestor de tareas +
+calendario que compartía la página con ellos (el usuario no planifica con
+anticipación, estudia tema por tema según el día). Se revierte:
+
+- **Racha de estudio y Puntos de continuidad restaurados** tal como estaban
+  antes de v1.16.0, en `/planificacion` (nav vuelve a decir "Ritmo y
+  continuidad").
+- **Gestor de tareas + calendario eliminado** de `PlanningPage.tsx` — el
+  formulario de alta de tareas, el listado y el `FullCalendar` de
+  arrastrar/soltar. Las tareas que ya existían en la base (`task`) no se
+  tocan ni se borran, simplemente dejan de tener una pantalla propia.
+
 ## [1.16.0] — Ajustes de uso real (Ritmo, Pomodoro unificado, limpieza de sesiones)
 
 - **Ritmo y continuidad eliminado**: la "racha de estudio" y los "puntos de
