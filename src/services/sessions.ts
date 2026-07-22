@@ -264,6 +264,9 @@ export interface FinalizeSessionInput {
   masteryConfidence?: number;
   masteryDifficulty?: number;
   masteryExplanation?: string;
+  /** Nota externa 0-10 (ej. ChatGPT) — separada del nivel de dominio 0-5. Solo se
+   * guarda si también se seteó masteryLevel (mastery_assessment.level es NOT NULL). */
+  externalScore0to10?: number;
   needsReview?: boolean;
   reviewDueAt?: string | null;
   completions?: SessionCompletions;
@@ -353,6 +356,7 @@ export async function finalizeSession(
       notes: null,
       created_at: now(),
       updated_at: now(),
+      external_score_0_10: input.externalScore0to10 ?? null,
     };
     await masteryAssessmentsRepo.insert(mastery);
   }

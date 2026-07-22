@@ -106,6 +106,7 @@ export function ActiveSessionPage() {
   const [masteryConfidence, setMasteryConfidence] = useState("70");
   const [masteryDifficulty, setMasteryDifficulty] = useState("50");
   const [masteryExplanation, setMasteryExplanation] = useState("");
+  const [externalScore, setExternalScore] = useState("");
   const [needsReview, setNeedsReview] = useState(true);
   const [reviewDueAt, setReviewDueAt] = useState("");
   const [finalizing, setFinalizing] = useState(false);
@@ -154,6 +155,10 @@ export function ActiveSessionPage() {
       ]);
       setCompetency(c);
       setTopic(t);
+      // Tildado por defecto: si la sesión tiene un tema vinculado que todavía no
+      // está completo, se asume que terminar de estudiarlo hoy lo completa —
+      // el usuario puede destildarlo si esta sesión no cerró el tema del todo.
+      if (t && !t.completed_at) setCompleteTopicChecked(true);
       setBlocks(b);
       setVaultConfigured(vault !== null);
       setRelatedTask(task && !task.completed_at ? task : null);
@@ -326,6 +331,7 @@ export function ActiveSessionPage() {
               masteryConfidence: Number(masteryConfidence),
               masteryDifficulty: Number(masteryDifficulty),
               ...(masteryExplanation ? { masteryExplanation } : {}),
+              ...(externalScore !== "" ? { externalScore0to10: Number(externalScore) } : {}),
             }
           : {}),
         completions: {
@@ -767,6 +773,18 @@ export function ActiveSessionPage() {
                   value={masteryExplanation}
                   onChange={(e) => setMasteryExplanation(e.target.value)}
                   rows={2}
+                  className={inputClass}
+                />
+              </Field>
+            )}
+            {masteryLevel !== "" && (
+              <Field label="Nota externa (0-10, opcional — ej. una evaluación de ChatGPT)">
+                <input
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={externalScore}
+                  onChange={(e) => setExternalScore(e.target.value)}
                   className={inputClass}
                 />
               </Field>

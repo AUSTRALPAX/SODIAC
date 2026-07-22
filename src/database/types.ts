@@ -281,6 +281,8 @@ export interface MasteryAssessmentRow {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** Nota externa 0-10 (ej. evaluación de ChatGPT), separada del nivel de dominio 0-5. */
+  external_score_0_10: number | null;
 }
 
 export interface ReviewRow extends BaseRow {

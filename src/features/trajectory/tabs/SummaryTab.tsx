@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { academicTranscriptEntriesRepo, subjectAssessmentPlansRepo } from "@/database/entities";
 import { listXpHistory } from "@/services/xp";
+import { getExternalScoreAverage, type ExternalScoreAverage } from "@/services/mastery";
 import type { AcademicRankRow, XpEventRow } from "@/database/types";
 import type { LevelProgress } from "@/services/xp";
 
@@ -14,6 +15,7 @@ export function SummaryTab({
   const [completedSubjects, setCompletedSubjects] = useState(0);
   const [activeSubjects, setActiveSubjects] = useState(0);
   const [average10, setAverage10] = useState<number | null>(null);
+  const [externalScore, setExternalScore] = useState<ExternalScoreAverage>({ average: null, count: 0 });
   const [recentXp, setRecentXp] = useState<XpEventRow[]>([]);
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export function SummaryTab({
       const entries = await academicTranscriptEntriesRepo.list({ where: "status = 'vigente'" });
       setAverage10(entries.length > 0 ? entries.reduce((sum, e) => sum + e.score_10, 0) / entries.length : null);
 
+      setExternalScore(await getExternalScoreAverage());
       setRecentXp(await listXpHistory(5));
     })();
   }, []);
@@ -51,6 +54,26 @@ export function SummaryTab({
             <dd className="text-sm text-text-primary">{currentRank?.name ?? "—"}</dd>
           </div>
         </dl>
+      </div>
+
+      <div className="rounded border border-border-subtle bg-surface p-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Promedio de notas externas (por tema)
+        </h3>
+        <p className="mt-1 text-xs text-text-muted">
+          Distinto del promedio académico formal — es el promedio de las notas que cargás vos mismo al
+          finalizar un estudio (ej. una evaluación de ChatGPT sobre el tema).
+        </p>
+        {externalScore.count === 0 ? (
+          <p className="mt-3 text-sm text-text-muted">Todavía no cargaste ninguna nota externa.</p>
+        ) : (
+          <p className="mt-3 font-display text-xl text-text-primary">
+            {externalScore.average!.toFixed(1)} / 10{" "}
+            <span className="text-xs font-sans text-text-muted">
+              ({externalScore.count} nota{externalScore.count === 1 ? "" : "s"} cargada{externalScore.count === 1 ? "" : "s"})
+            </span>
+          </p>
+        )}
       </div>
 
       <div className="rounded border border-border-subtle bg-surface p-4">

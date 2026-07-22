@@ -2,6 +2,22 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.17.0] — Auto-completar tema al finalizar + nota externa 0-10
+
+- **"Tema" tildado por defecto** en el modal de Finalizar estudio cuando la
+  sesión tiene un tema vinculado sin completar — antes había que tildarlo a
+  mano o el tema seguía apareciendo como pendiente en Carrera (no era un bug
+  de XP duplicado: son dos categorías de XP distintas — tarea de seguimiento
+  vs. finalización del tema — que ambas usan el mismo mecanismo idempotente
+  de `awardXp()`, sin riesgo real de doble otorgamiento).
+- **Nota externa 0-10** (ej. una evaluación de ChatGPT sobre el tema
+  estudiado): nuevo campo opcional en el modal de Finalizar estudio, columna
+  nueva `mastery_assessment.external_score_0_10` (migración `0018`, aditiva).
+  Es un concepto separado del nivel de dominio 0-5 existente y de
+  `academic_transcript_entry.score_10` (calificación formal por materia) —
+  ninguno de los dos se toca ni se re-escala. El promedio se muestra en
+  Trayectoria → Resumen ("Promedio de notas externas (por tema)").
+
 ## [1.16.1] — Corrección: Ritmo y continuidad no se quería sacar
 
 La v1.16.0 interpretó mal el pedido del usuario: lo que sobraba no era
