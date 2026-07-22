@@ -2,6 +2,31 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.16.0] — Ajustes de uso real (Ritmo, Pomodoro unificado, limpieza de sesiones)
+
+- **Ritmo y continuidad eliminado**: la "racha de estudio" y los "puntos de
+  continuidad" eran 100% de solo lectura (nada que el usuario pudiera guardar
+  ahí), tenían un bug de zona horaria en el conteo, y duplicaban el calendario
+  de actividad que ya existe en el Dashboard. La página `/planificacion`
+  vuelve a llamarse "Planificación" y solo muestra tareas + calendario, como
+  antes de la Fase 5. Los datos subyacentes (`continuity_point`,
+  `src/services/rhythm.ts`) no se tocan ni se pierden, solo dejan de
+  renderizarse.
+- **Pomodoro unificado**: el widget del Dashboard y el temporizador de
+  "Iniciar estudio" eran dos implementaciones independientes con valores por
+  defecto distintos (25/10/4 vs 25/5/∞) que nunca se comunicaban entre sí.
+  Ahora comparten una sola configuración persistida
+  (`src/services/pomodoroSettings.ts`) y el mismo beep sintetizado al cambiar
+  de fase — cambiar la configuración en cualquiera de los dos lugares afecta
+  a ambos. El temporizador de sesiones además ahora respeta un tope de
+  cantidad de sesiones (antes ciclaba indefinidamente).
+- **Archivar sesiones**: nuevo botón "Archivar" en las pestañas Canceladas e
+  Incompletas de Sesiones, y una nueva pestaña "Archivadas" con "Restaurar" —
+  reutiliza la columna `archived_at` que ya existía en el esquema pero nunca
+  se conectó a `study_session`. No es un borrado real: cero riesgo de dejar
+  registros huérfanos en evidencia/tareas/bibliografía/puntos de continuidad
+  vinculados, y es reversible en cualquier momento.
+
 ## [1.12.0]–[1.15.0] — Mejora integral (fases 1 a 7)
 
 Ciclo de mejora sobre la base ya existente: sin reconstruir nada desde cero, sin

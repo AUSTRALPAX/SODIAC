@@ -81,7 +81,22 @@ export async function getInProgressSession(): Promise<StudySessionRow | null> {
 }
 
 export async function listSessions(): Promise<StudySessionRow[]> {
-  return studySessionsRepo.list({ orderBy: "started_at DESC" });
+  return studySessionsRepo.list({ where: "archived_at IS NULL", orderBy: "started_at DESC" });
+}
+
+/** Archivado lógico (nunca borrado destructivo — ver docs/DATA_MODEL.md): oculta
+ * una sesión de la lista sin perder su historial ni el de las tablas que la
+ * referencian (evidencia, tareas, bibliografía, puntos de continuidad). */
+export async function archiveSession(id: string): Promise<void> {
+  await studySessionsRepo.archive(id);
+}
+
+export async function listArchivedSessions(): Promise<StudySessionRow[]> {
+  return studySessionsRepo.list({ where: "archived_at IS NOT NULL", orderBy: "started_at DESC" });
+}
+
+export async function unarchiveSession(id: string): Promise<void> {
+  await studySessionsRepo.update(id, { archived_at: null });
 }
 
 export async function cancelSession(id: string, reason?: string): Promise<void> {

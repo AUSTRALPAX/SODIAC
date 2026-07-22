@@ -16,12 +16,15 @@ import {
 } from "@/database/entities";
 import type { StudySessionRow } from "@/database/types";
 import {
+  archiveSession,
   cancelSession,
   getRelatedTaskForSession,
+  listArchivedSessions,
   listSessions,
   markSessionIncomplete,
   reprogramSession,
   startScheduledSession,
+  unarchiveSession,
 } from "@/services/sessions";
 
 const CLOSURE_LABEL: Record<StudySessionRow["closure_status"], string> = {
@@ -38,7 +41,16 @@ const CLOSURE_COLOR: Record<StudySessionRow["closure_status"], string> = {
   incompleta: "text-warning",
 };
 
-type ViewId = "proxima" | "programadas" | "en_curso" | "completadas" | "incompletas" | "canceladas" | "historial" | "calendario";
+type ViewId =
+  | "proxima"
+  | "programadas"
+  | "en_curso"
+  | "completadas"
+  | "incompletas"
+  | "canceladas"
+  | "historial"
+  | "calendario"
+  | "archivadas";
 
 const VIEWS: { id: ViewId; label: string }[] = [
   { id: "proxima", label: "Próxima" },
@@ -49,6 +61,7 @@ const VIEWS: { id: ViewId; label: string }[] = [
   { id: "canceladas", label: "Canceladas" },
   { id: "historial", label: "Historial" },
   { id: "calendario", label: "Calendario" },
+  { id: "archivadas", label: "Archivadas" },
 ];
 
 function isProgramada(s: StudySessionRow): boolean {
@@ -61,6 +74,7 @@ function isEnCurso(s: StudySessionRow): boolean {
 export function SessionsPage() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<StudySessionRow[]>([]);
+  const [archived, setArchived] = useState<StudySessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const { value: viewPrefs, update: updateViewPrefs } = useViewPreference(
     "sessions",
@@ -72,7 +86,9 @@ export function SessionsPage() {
   const [reprogramDate, setReprogramDate] = useState("");
 
   const refresh = useCallback(async () => {
-    setSessions(await listSessions());
+    const [sessionRows, archivedRows] = await Promise.all([listSessions(), listArchivedSessions()]);
+    setSessions(sessionRows);
+    setArchived(archivedRows);
     setLoading(false);
   }, []);
 
@@ -103,6 +119,16 @@ export function SessionsPage() {
 
   async function handleIncomplete(id: string) {
     await markSessionIncomplete(id, "Marcada como incompleta desde Sesiones.");
+    await refresh();
+  }
+
+  async function handleArchive(id: string) {
+    await archiveSession(id);
+    await refresh();
+  }
+
+  async function handleUnarchive(id: string) {
+    await unarchiveSession(id);
     await refresh();
   }
 
@@ -209,18 +235,36 @@ export function SessionsPage() {
             sessions={incomplete}
             empty="No hay sesiones incompletas."
             renderActions={(s) => (
-              <Link to={`/sesiones/${s.id}`} className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent">
-                Ver
-              </Link>
+              <>
+                <Link to={`/sesiones/${s.id}`} className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:border-accent hover:text-accent">
+                  Ver
+                </Link>
+                <ActionButton onClick={() => handleArchive(s.id)}>Archivar</ActionButton>
+              </>
             )}
           />
         )}
 
-        {view === "canceladas" && <SessionList sessions={cancelled} empty="No hay sesiones canceladas." />}
+        {view === "canceladas" && (
+          <SessionList
+            sessions={cancelled}
+            empty="No hay sesiones canceladas."
+            renderActions={(s) => <ActionButton onClick={() => handleArchive(s.id)}>Archivar</ActionButton>}
+          />
+        )}
 
         {view === "historial" && <SessionList sessions={historial} empty="Todavía no hay historial." showStatus />}
 
         {view === "calendario" && <SessionCalendar sessions={sessions} onSelect={(id) => navigate(`/sesiones/${id}`)} />}
+
+        {view === "archivadas" && (
+          <SessionList
+            sessions={archived}
+            empty="No hay sesiones archivadas."
+            showStatus
+            renderActions={(s) => <ActionButton onClick={() => handleUnarchive(s.id)}>Restaurar</ActionButton>}
+          />
+        )}
       </div>
 
       {reprogramTarget && (

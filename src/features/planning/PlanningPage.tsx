@@ -16,7 +16,6 @@ import {
 import { subjectsRepo, topicsRepo } from "@/database/entities";
 import type { SubjectRow, TaskRow, TopicRow } from "@/database/types";
 import { localDateInputToIso } from "@/utils/date";
-import { computeStudyStreak, listContinuityPoints, type ContinuityPointView, type StudyStreak } from "@/services/rhythm";
 
 const PRIORITIES: TaskRow["priority"][] = ["baja", "media", "alta", "critica"];
 const PRIORITY_LABEL: Record<TaskRow["priority"], string> = {
@@ -45,22 +44,15 @@ export function PlanningPage() {
   const [topicId, setTopicId] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const [streak, setStreak] = useState<StudyStreak | null>(null);
-  const [continuityPoints, setContinuityPoints] = useState<ContinuityPointView[]>([]);
-
   const refresh = useCallback(async () => {
-    const [taskRows, subjectRows, topicRows, streakResult, continuityResult] = await Promise.all([
+    const [taskRows, subjectRows, topicRows] = await Promise.all([
       listAllTasks(),
       subjectsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
       topicsRepo.list({ where: "archived_at IS NULL", orderBy: "title" }),
-      computeStudyStreak(),
-      listContinuityPoints(),
     ]);
     setTasks(taskRows);
     setSubjects(subjectRows);
     setTopics(topicRows);
-    setStreak(streakResult);
-    setContinuityPoints(continuityResult);
     setLoading(false);
   }, []);
 
@@ -129,55 +121,7 @@ export function PlanningPage() {
 
   return (
     <div className="h-full space-y-6 overflow-y-auto p-8">
-      <h1 className="font-display text-2xl">Ritmo y continuidad</h1>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <section className="rounded border border-border-subtle bg-surface p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-            Racha de estudio
-          </h2>
-          {!streak ? (
-            <p className="mt-2 text-sm text-text-muted">Cargando…</p>
-          ) : streak.currentStreak > 0 ? (
-            <p className="mt-2 text-sm text-text-primary">
-              {streak.currentStreak === 1 ? "1 día seguido" : `${streak.currentStreak} días seguidos`}
-              {streak.longestStreak > streak.currentStreak && ` · récord: ${streak.longestStreak} días`}
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-text-muted">
-              Sin racha activa
-              {streak.lastStudyDate &&
-                // lastStudyDate es un YYYY-MM-DD puro (de date(started_at) en SQL) — hay
-                // que anclarlo a medianoche LOCAL, si no new Date() lo interpreta como UTC
-                // y en husos negativos (Argentina, UTC-3) muestra el día anterior.
-                ` — la última sesión fue el ${new Date(`${streak.lastStudyDate}T00:00:00`).toLocaleDateString("es-AR")}`}
-              {streak.longestStreak > 0 && ` · récord: ${streak.longestStreak} días`}
-            </p>
-          )}
-        </section>
-
-        <section className="rounded border border-border-subtle bg-surface p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-            Puntos de continuidad
-          </h2>
-          {continuityPoints.length === 0 ? (
-            <p className="mt-2 text-sm text-text-muted">Todavía no hay puntos de continuidad guardados.</p>
-          ) : (
-            <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto text-sm">
-              {continuityPoints.map((point) => (
-                <li key={point.id} className="border-b border-border-subtle pb-2 last:border-0">
-                  <p className="text-text-primary">{point.description}</p>
-                  <p className="text-xs text-text-muted">
-                    {new Date(point.createdAt).toLocaleDateString("es-AR")}
-                    {(point.subjectTitle || point.topicTitle || point.projectTitle) &&
-                      ` · ${[point.subjectTitle, point.topicTitle, point.projectTitle].filter(Boolean).join(" · ")}`}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+      <h1 className="font-display text-2xl">Planificación</h1>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
       <div className="space-y-6">

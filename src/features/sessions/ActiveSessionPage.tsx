@@ -40,11 +40,8 @@ import {
   previewTopicCompletion,
   type SubjectCompletionGate,
 } from "@/services/completionXp";
-import {
-  usePomodoro,
-  DEFAULT_POMODORO_SETTINGS,
-  type PomodoroPhase,
-} from "./usePomodoro";
+import { usePomodoro, type PomodoroPhase } from "./usePomodoro";
+import { DEFAULT_POMODORO_SETTINGS, getPomodoroSettings, type PomodoroSettings } from "@/services/pomodoroSettings";
 
 const PHASE_LABEL: Record<PomodoroPhase, string> = {
   foco: "Foco",
@@ -227,7 +224,12 @@ export function ActiveSessionPage() {
     [session],
   );
 
-  const pomodoro = usePomodoro(DEFAULT_POMODORO_SETTINGS, onPhaseComplete);
+  const [pomodoroSettings, setPomodoroSettingsState] = useState<PomodoroSettings>(DEFAULT_POMODORO_SETTINGS);
+  useEffect(() => {
+    void getPomodoroSettings().then(setPomodoroSettingsState);
+  }, []);
+
+  const pomodoro = usePomodoro(pomodoroSettings, onPhaseComplete);
 
   useEffect(() => {
     if (!session || !showFinalize) return;
@@ -453,23 +455,39 @@ export function ActiveSessionPage() {
       <section className="rounded border border-border-subtle bg-surface p-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-wide text-text-muted">{PHASE_LABEL[pomodoro.phase]}</p>
-            <p className="font-display text-4xl tabular-nums">{formatClock(pomodoro.remainingSeconds)}</p>
-          </div>
-          <div className="flex gap-2">
-            {!pomodoro.running ? (
-              <button onClick={pomodoro.start} className="rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent">
-                Iniciar
-              </button>
+            {pomodoro.finished ? (
+              <>
+                <p className="text-xs uppercase tracking-wide text-text-muted">Pomodoro completo</p>
+                <p className="font-display text-2xl text-accent">¡Listo!</p>
+                <p className="mt-1 text-xs text-text-muted">
+                  Completaste {pomodoroSettings.totalSessions} sesión{pomodoroSettings.totalSessions === 1 ? "" : "es"} de enfoque.
+                </p>
+              </>
             ) : (
-              <button onClick={pomodoro.pause} className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary">
-                Pausar
-              </button>
+              <>
+                <p className="text-xs uppercase tracking-wide text-text-muted">
+                  {PHASE_LABEL[pomodoro.phase]} · sesión {pomodoro.cycleIndex} de {pomodoroSettings.totalSessions}
+                </p>
+                <p className="font-display text-4xl tabular-nums">{formatClock(pomodoro.remainingSeconds)}</p>
+              </>
             )}
-            <button onClick={pomodoro.skip} className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary">
-              Saltar fase
-            </button>
           </div>
+          {!pomodoro.finished && (
+            <div className="flex gap-2">
+              {!pomodoro.running ? (
+                <button onClick={pomodoro.start} className="rounded border border-accent px-3 py-1.5 text-xs uppercase tracking-wide text-accent">
+                  Iniciar
+                </button>
+              ) : (
+                <button onClick={pomodoro.pause} className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary">
+                  Pausar
+                </button>
+              )}
+              <button onClick={pomodoro.skip} className="rounded border border-border px-3 py-1.5 text-xs uppercase tracking-wide text-text-secondary">
+                Saltar fase
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

@@ -1,24 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getSetting, setSetting } from "@/services/settings";
-
-const SETTINGS_KEY = "pomodoro_dashboard_settings";
-
-interface PomodoroDashboardSettings {
-  workMinutes: number;
-  breakMinutes: number;
-  totalSessions: number;
-}
-
-const DEFAULT_SETTINGS: PomodoroDashboardSettings = {
-  workMinutes: 25,
-  breakMinutes: 10,
-  totalSessions: 4,
-};
+import {
+  DEFAULT_POMODORO_SETTINGS,
+  getPomodoroSettings,
+  playPomodoroBeep,
+  setPomodoroSettings,
+  type PomodoroSettings,
+} from "@/services/pomodoroSettings";
 
 type Phase = "trabajo" | "descanso";
 
-function secondsFor(phase: Phase, settings: PomodoroDashboardSettings): number {
-  return (phase === "trabajo" ? settings.workMinutes : settings.breakMinutes) * 60;
+function secondsFor(phase: Phase, settings: PomodoroSettings): number {
+  return (phase === "trabajo" ? settings.focusMinutes : settings.shortBreakMinutes) * 60;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -27,27 +19,6 @@ function formatTime(totalSeconds: number): string {
     .padStart(2, "0");
   const s = (totalSeconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
-}
-
-/** Beep corto sintetizado (sin assets ni plugin de Tauri) para marcar el cambio de fase. */
-function playBeep() {
-  try {
-    const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-    osc.onended = () => void ctx.close();
-  } catch {
-    // El navegador puede bloquear AudioContext sin interacción previa del usuario — no es crítico.
-  }
 }
 
 /**
@@ -59,19 +30,18 @@ function playBeep() {
  * sin sonar, para permitir por ejemplo "sin descanso".
  */
 export function PomodoroSection() {
-  const [settings, setSettingsState] = useState<PomodoroDashboardSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettingsState] = useState<PomodoroSettings>(DEFAULT_POMODORO_SETTINGS);
   const [loaded, setLoaded] = useState(false);
   const [phase, setPhase] = useState<Phase>("trabajo");
   const [sessionIndex, setSessionIndex] = useState(1);
-  const [remainingSeconds, setRemainingSeconds] = useState(DEFAULT_SETTINGS.workMinutes * 60);
+  const [remainingSeconds, setRemainingSeconds] = useState(DEFAULT_POMODORO_SETTINGS.focusMinutes * 60);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
   useEffect(() => {
-    void getSetting<PomodoroDashboardSettings>(SETTINGS_KEY).then((stored) => {
-      const next = stored ?? DEFAULT_SETTINGS;
+    void getPomodoroSettings().then((next) => {
       setSettingsState(next);
       setRemainingSeconds(secondsFor("trabajo", next));
       setLoaded(true);
@@ -98,7 +68,7 @@ export function PomodoroSection() {
         if (next > settingsRef.current.totalSessions) {
           setRunning(false);
           setFinished(true);
-          playBeep();
+          playPomodoroBeep();
           return;
         }
         idx = next;
@@ -109,7 +79,7 @@ export function PomodoroSection() {
         setPhase(p);
         setSessionIndex(idx);
         setRemainingSeconds(duration);
-        playBeep();
+        playPomodoroBeep();
         return;
       }
     }
@@ -122,14 +92,14 @@ export function PomodoroSection() {
     if (running && remainingSeconds === 0 && !finished) advance();
   }, [running, remainingSeconds, finished, advance]);
 
-  function updateSettings(patch: Partial<PomodoroDashboardSettings>) {
+  function updateSettings(patch: Partial<PomodoroSettings>) {
     // Forma funcional: si dos campos cambian antes de que React vuelva a
     // renderizar (por ejemplo al editar varios inputs rápido), leer `settings`
     // por closure aquí perdería el primer cambio al pisarlo con un objeto
     // desactualizado.
     setSettingsState((prev) => {
       const next = { ...prev, ...patch };
-      void setSetting(SETTINGS_KEY, next);
+      void setPomodoroSettings(next);
       return next;
     });
   }
@@ -218,11 +188,11 @@ export function PomodoroSection() {
             type="number"
             min={0}
             max={60}
-            value={settings.workMinutes}
+            value={settings.focusMinutes}
             disabled={running}
             onChange={(e) => {
               const v = Math.min(60, Math.max(0, Number(e.target.value)));
-              updateSettings({ workMinutes: v });
+              updateSettings({ focusMinutes: v });
               if (!running && phase === "trabajo" && !finished) setRemainingSeconds(v * 60);
             }}
             className="mt-1 block w-full rounded border border-border bg-background px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none disabled:opacity-40"
@@ -234,11 +204,11 @@ export function PomodoroSection() {
             type="number"
             min={0}
             max={60}
-            value={settings.breakMinutes}
+            value={settings.shortBreakMinutes}
             disabled={running}
             onChange={(e) => {
               const v = Math.min(60, Math.max(0, Number(e.target.value)));
-              updateSettings({ breakMinutes: v });
+              updateSettings({ shortBreakMinutes: v });
               if (!running && phase === "descanso" && !finished) setRemainingSeconds(v * 60);
             }}
             className="mt-1 block w-full rounded border border-border bg-background px-2 py-1 text-sm text-text-primary focus:border-accent focus:outline-none disabled:opacity-40"
