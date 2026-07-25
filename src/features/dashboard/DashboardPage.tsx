@@ -625,7 +625,7 @@ function TrayectoriaSection() {
         <div className="flex gap-6 text-right text-xs text-text-muted">
           {ipa != null && (
             <div>
-              <p className="text-text-muted">IPA</p>
+              <p className="text-text-muted">IPA · Índice de Progreso Académico</p>
               <p className="font-display text-lg text-text-primary">{(ipa * 100).toFixed(1)}%</p>
             </div>
           )}

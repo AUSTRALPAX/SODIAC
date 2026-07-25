@@ -83,7 +83,7 @@ export function TrajectoryPage() {
             <p className="mt-0.5 text-text-primary">{nextRank?.name ?? "—"}</p>
           </div>
           <div>
-            <p className="text-text-muted">IPA total</p>
+            <p className="text-text-muted">IPA total · Índice de Progreso Académico</p>
             <p className="mt-0.5 text-accent">{ipaTotal != null ? (ipaTotal * 100).toFixed(1) : "—"}%</p>
           </div>
         </div>

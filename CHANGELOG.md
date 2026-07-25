@@ -2,6 +2,12 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.17.2] — Aclarar el nombre completo del IPA
+
+- La etiqueta "IPA" (Dashboard y Trayectoria) ahora muestra también el
+  nombre completo — "IPA · Índice de Progreso Académico" — para que quede
+  claro qué significa la sigla sin tener que preguntar.
+
 ## [1.17.1] — Espaciado de los encabezados de la barra lateral
 
 - Corregido: "INICIO" quedaba pegado al borde superior de la barra lateral
