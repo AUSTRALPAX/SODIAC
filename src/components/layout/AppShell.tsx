@@ -2,7 +2,17 @@ import { NavLink, Outlet } from "react-router-dom";
 import { SodiacLogo } from "@/components/brand/SodiacLogo";
 import { NAV_GROUPS } from "./navGroups";
 import { CommandPalette } from "./CommandPalette";
+import { SidebarSectionLabel } from "./SidebarSectionLabel";
 import { SessionRecoveryBanner } from "@/features/sessions/SessionRecoveryBanner";
+
+/** Espaciado del contenedor de cada grupo de nav — el primero necesita su
+ * propio padding-top (no hay un grupo anterior ni borde que lo empuje);
+ * los siguientes se separan del anterior con un margen + línea divisoria.
+ * Antes el primer grupo no tenía ninguna de estas dos clases ("" vacío),
+ * por eso "INICIO" quedaba pegado al borde superior a diferencia de
+ * "ESTUDIO" y el resto. */
+const FIRST_GROUP_CLASSES = "pt-4";
+const OTHER_GROUP_CLASSES = "mt-3 border-t border-border-subtle pt-3";
 
 export function AppShell() {
   return (
@@ -19,10 +29,8 @@ export function AppShell() {
         </div>
         <nav className="flex-1 overflow-y-auto px-2 pb-2">
           {NAV_GROUPS.map((group, index) => (
-            <div key={group.label} className={index === 0 ? "" : "mt-3 border-t border-border-subtle pt-3"}>
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-                {group.label}
-              </p>
+            <div key={group.label} className={index === 0 ? FIRST_GROUP_CLASSES : OTHER_GROUP_CLASSES}>
+              <SidebarSectionLabel>{group.label}</SidebarSectionLabel>
               <div className="space-y-0.5">
                 {group.items.map((item) => (
                   <NavLink

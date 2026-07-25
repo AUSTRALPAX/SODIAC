@@ -2,6 +2,20 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.17.1] — Espaciado de los encabezados de la barra lateral
+
+- Corregido: "INICIO" quedaba pegado al borde superior de la barra lateral
+  a diferencia de "ESTUDIO" y el resto de los encabezados de grupo. Causa
+  raíz: el primer grupo de navegación (`AppShell.tsx`) recibía un
+  `className` vacío mientras los siguientes recibían `mt-3 border-t ... pt-3`
+  — nunca tuvo su propio espaciado superior.
+- Nuevo componente compartido `SidebarSectionLabel` (`src/components/layout/SidebarSectionLabel.tsx`)
+  para que los cinco encabezados (INICIO, ESTUDIO, PRODUCCIÓN, CONOCIMIENTO,
+  ANÁLISIS, SISTEMA) usen exactamente el mismo estilo, sin excepciones por
+  posición. El espaciado del primer grupo (`pt-4`) y el de los siguientes
+  (`mt-3 border-t border-border-subtle pt-3`) quedan como dos constantes
+  nombradas en `AppShell.tsx`, no como valores sueltos.
+
 ## [1.17.0] — Auto-completar tema al finalizar + nota externa 0-10
 
 - **"Tema" tildado por defecto** en el modal de Finalizar estudio cuando la
