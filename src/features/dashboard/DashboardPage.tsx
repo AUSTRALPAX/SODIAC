@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { Link } from "react-router-dom";
 import {
   Bar,
@@ -89,6 +90,8 @@ function relativeAgo(iso: string | null): string {
 }
 
 export function DashboardPage() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestore(scrollRef, "dashboard");
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState<CareerOverview | null>(null);
   const [summary, setSummary] = useState<SummaryCounts | null>(null);
@@ -220,7 +223,7 @@ export function DashboardPage() {
   if (loading || !prefs) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
+    <div ref={scrollRef} className="flex h-full flex-col overflow-y-auto">
       <header
         className="relative isolate shrink-0 overflow-hidden border-b border-border-subtle px-10 py-[30px]"
         style={{

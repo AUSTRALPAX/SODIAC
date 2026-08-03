@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { computeStudyStreak, listContinuityPoints, type ContinuityPointView, type StudyStreak } from "@/services/rhythm";
 
 export function PlanningPage() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestore(scrollRef, "planning");
   const [streak, setStreak] = useState<StudyStreak | null>(null);
   const [continuityPoints, setContinuityPoints] = useState<ContinuityPointView[]>([]);
 
@@ -16,7 +19,7 @@ export function PlanningPage() {
   }, [refresh]);
 
   return (
-    <div className="h-full space-y-6 overflow-y-auto p-8">
+    <div ref={scrollRef} className="h-full space-y-6 overflow-y-auto p-8">
       <h1 className="font-display text-2xl">Ritmo y continuidad</h1>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

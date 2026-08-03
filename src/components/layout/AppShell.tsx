@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { SodiacLogo } from "@/components/brand/SodiacLogo";
 import { NAV_GROUPS } from "./navGroups";
 import { CommandPalette } from "./CommandPalette";
+import { NavigationBar } from "./NavigationBar";
 import { SidebarSectionLabel } from "./SidebarSectionLabel";
 import { SessionRecoveryBanner } from "@/features/sessions/SessionRecoveryBanner";
 
@@ -57,9 +58,14 @@ export function AppShell() {
           Ctrl+K para buscar
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto">
-        <SessionRecoveryBanner />
-        <Outlet />
+      {/* El scroller pasó de ser <main> a un div interno para que la barra de
+          navegación quede fija arriba. `id` lo usa useScrollRestore por defecto. */}
+      <main className="flex flex-1 flex-col overflow-hidden">
+        <NavigationBar />
+        <div id="sodiac-scroll" className="flex-1 overflow-y-auto">
+          <SessionRecoveryBanner />
+          <Outlet />
+        </div>
       </main>
       <CommandPalette />
     </div>

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile } from "@tauri-apps/plugin-fs";
 import { PdfViewer } from "@/components/documents/PdfViewer";
@@ -46,6 +47,8 @@ const STATUS_OPTIONS: InstitutionalDocumentRow["status"][] = [
 ];
 
 export function DocumentsPage() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestore(scrollRef, "documents");
   const [documents, setDocuments] = useState<DocumentWithVersion[]>([]);
   const { value: viewPrefs, update: updateViewPrefs, loaded: prefsLoaded } = useViewPreference(
     "documents",
@@ -114,7 +117,7 @@ export function DocumentsPage() {
   if (loading) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
 
   return (
-    <div className="grid h-full grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-[320px_1fr]">
+    <div ref={scrollRef} className="grid h-full grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-[320px_1fr]">
       <div>
         <h1 className="font-display text-2xl">Documentos</h1>
         <p className="mt-1 text-sm text-text-secondary">

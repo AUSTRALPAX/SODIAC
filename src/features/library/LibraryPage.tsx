@@ -122,7 +122,7 @@ const FUNCTION_LABEL: Record<NonNullable<ResourceRow["function_note"]>, string> 
 type SortKey = "titulo" | "area" | "autor" | "reciente" | "estado";
 
 export function LibraryPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [resources, setResources] = useState<ResourceRow[]>([]);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [subjects, setSubjects] = useState<SubjectRow[]>([]);
@@ -210,15 +210,15 @@ export function LibraryPage() {
     void refresh();
   }, [refresh]);
 
-  // Si se llega desde el Cronograma Maestro con ?tema=, prefill una sola vez.
+  // Si se llega desde el Cronograma Maestro con ?tema=, aplicar el filtro.
+  // El parámetro NO se borra de la URL y se lee como dependencia: si se borrara
+  // (o se leyera solo al montar), volver con Atrás a esta entrada dejaría de
+  // re-aplicar el filtro y la URL ya no describiría lo que se está viendo.
+  const temaParam = searchParams.get("tema");
   useEffect(() => {
-    const tema = searchParams.get("tema");
-    if (tema) {
-      updateViewPrefs({ topicFilter: tema }, { immediate: true });
-      setSearchParams({}, { replace: true });
-    }
+    if (temaParam) updateViewPrefs({ topicFilter: temaParam }, { immediate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [temaParam]);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();

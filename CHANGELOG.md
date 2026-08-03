@@ -2,6 +2,66 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.18.0] — Navegación Atrás/Adelante (Entrega 1)
+
+Primera de dos entregas. Esta no toca la base de datos ni el historial
+académico: es sólo navegación. La reversión de contenidos marcados como
+completados va en la Entrega 2, con migración y backup previo.
+
+### Historial navegable
+
+- Nueva barra de navegación fija (`NavigationBar.tsx`) sobre el contenido,
+  con botones Atrás y Adelante que se deshabilitan de verdad cuando no hay
+  a dónde ir — no es un `history.back()` a ciegas.
+- Nuevo hook `useAppHistory`. React Router 7 no expone `canGoBack` /
+  `canGoForward`, así que el estado se deriva del índice que el propio
+  router guarda en `history.state.idx`. Un PUSH trunca el máximo alcanzado
+  (se perdió el "adelante"); POP y REPLACE lo conservan.
+- Si no hay historial previo (la app se abrió directamente en una ruta
+  profunda), Atrás **nunca** llama a `navigate(-1)` — eso cerraría la
+  aplicación. En su lugar sube al padre jerárquico: `/carrera/:id` →
+  `/carrera`, `/sesiones/:id` → `/sesiones`, el resto al Dashboard.
+
+### Atajos
+
+- `Alt+←` y `Alt+→`, más los botones 4 y 5 del mouse.
+- Los atajos se ignoran mientras se escribe en un campo de texto — una
+  guarda de foco que el único listener global previo (`CommandPalette`)
+  no tenía.
+- Documentados en Configuración → Atajos de teclado.
+
+### Contexto al volver
+
+- Nuevo `useScrollRestore`: la posición de scroll se restaura al volver
+  (POP) y se resetea al navegar a algo nuevo (PUSH). Antes el scroll no
+  se reseteaba nunca al cambiar de sección. Se guarda **en memoria**, no
+  en la base: cada preferencia de vista persistida cuesta tres sentencias
+  SQL incluyendo una fila permanente en `activity_log`, y hacer eso en
+  cada pausa de scroll inflaría esa tabla.
+  La posición se anota **sólo** desde el listener de scroll, mientras la
+  página sigue montada. Guardarla al cambiar de ruta no funciona: para
+  entonces React ya montó la ruta nueva, el contenedor se encogió y el
+  navegador clampeó `scrollTop` a 0, así que se guardaba un cero encima
+  de la posición real. Por el mismo motivo se ignoran los eventos de
+  scroll sobre un contenedor sin nada que scrollear — son el clampeo del
+  navegador, no el usuario. Lo detectó la verificación en vivo; ningún
+  test unitario puede reproducirlo porque depende del layout real.
+  Al volver, la restauración espera a que el contenido asíncrono levante
+  la altura (hasta 2 s; Carrera la tiene a los ~400 ms) y se aborta si el
+  usuario scrollea mientras tanto.
+- Corregidos dos deep-links que rompían el Atrás: Biblioteca (`?tema=`) y
+  Mapa (`?buscar=`) borraban el parámetro de la URL con `replace` y lo
+  leían sólo al montar, así que volver atrás no re-aplicaba el filtro.
+  Ahora el parámetro se conserva y se lee como dependencia.
+- Cuatro navegaciones pasan a `replace` para no dejar entradas muertas:
+  tras crear una sesión y tras finalizarla o cancelarla.
+
+### Breadcrumbs
+
+- El breadcrumb de la sesión muestra la ruta completa
+  `Sesiones › materia › tema`, con la materia enlazada a su detalle.
+  Sigue siendo jerarquía, no historial: los botones hacen lo otro.
+
 ## [1.17.2] — Aclarar el nombre completo del IPA
 
 - La etiqueta "IPA" (Dashboard y Trayectoria) ahora muestra también el

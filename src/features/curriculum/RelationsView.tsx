@@ -231,12 +231,14 @@ export function RelationsView({ data }: { data: CurriculumData }) {
     });
   }, [fullMatches]);
 
-  // Si se llega desde el Cronograma Maestro con ?buscar=, prefill una sola vez.
+  // Si se llega desde el Cronograma Maestro con ?buscar=, aplicar la búsqueda.
+  // Se lee como dependencia (no solo al montar) para que volver con Atrás a una
+  // entrada con ?buscar= distinto vuelva a aplicarla — el componente no siempre
+  // se desmonta entre navegaciones.
+  const buscarParam = searchParams.get("buscar");
   useEffect(() => {
-    const initial = searchParams.get("buscar");
-    if (initial) setSearch(initial);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (buscarParam) setSearch(buscarParam);
+  }, [buscarParam]);
 
   const focusedData = useMemo(() => filterDataForFocus(data, focusSubjectId), [data, focusSubjectId]);
   // En foco, la materia siempre se muestra expandida (para eso es el foco) sin
@@ -386,8 +388,15 @@ export function RelationsView({ data }: { data: CurriculumData }) {
             <input
               value={search}
               onChange={(e) => {
-                setSearch(e.target.value);
-                if (searchParams.get("buscar")) setSearchParams({}, { replace: true });
+                const next = e.target.value;
+                setSearch(next);
+                // Mantener la URL sincronizada con lo tecleado, en vez de borrar
+                // el parámetro: así la URL no miente y Atrás/Adelante devuelven
+                // la búsqueda que estaba activa. `replace` evita meter una
+                // entrada de historial por cada tecla.
+                if ((searchParams.get("buscar") ?? "") !== next) {
+                  setSearchParams(next ? { buscar: next } : {}, { replace: true });
+                }
               }}
               placeholder={`Buscar entre los ${data.topics.length} temas…`}
               className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"

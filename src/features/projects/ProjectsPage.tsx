@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useViewPreference } from "@/hooks/useViewPreference";
 import { PROJECTS_VIEW_DEFAULTS, projectsViewPreferenceSchema } from "@/schemas/viewPreferences";
 import { projectMilestonesRepo } from "@/database/entities";
@@ -44,6 +45,8 @@ const CONTEXT_COLOR: Record<ProjectRow["context_type"], string> = {
 };
 
 export function ProjectsPage() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestore(scrollRef, "projects");
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const { value: viewPrefs, update: updateViewPrefs, loaded: prefsLoaded } = useViewPreference(
     "projects",
@@ -159,7 +162,7 @@ export function ProjectsPage() {
   if (loading) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
 
   return (
-    <div className="grid h-full grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-[320px_1fr]">
+    <div ref={scrollRef} className="grid h-full grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-[320px_1fr]">
       <div>
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl">Proyectos</h1>

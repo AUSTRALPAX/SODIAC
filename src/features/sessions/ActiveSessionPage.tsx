@@ -340,7 +340,9 @@ export function ActiveSessionPage() {
           completeSubject: completeSubjectChecked,
         },
       });
-      navigate("/sesiones");
+      // `replace`: la sesión quedó cerrada, volver a esta pantalla con Atrás
+      // mostraría una sesión activa que ya no existe.
+      navigate("/sesiones", { replace: true });
     } catch (error) {
       setFinalizeError(String(error instanceof Error ? error.message : error));
     } finally {
@@ -353,7 +355,7 @@ export function ActiveSessionPage() {
     const confirmed = window.confirm("¿Cancelar esta sesión? Queda registrada como incompleta.");
     if (!confirmed) return;
     await cancelSession(session.id);
-    navigate("/sesiones");
+    navigate("/sesiones", { replace: true });
   }
 
   function slugify(text: string): string {
@@ -419,15 +421,23 @@ export function ActiveSessionPage() {
     setUsedResourceIds((prev) => new Set(prev).add(resource.id));
   }
 
+  /** Ruta jerárquica: Sesiones › materia (enlazada) › tema. La materia es un
+   * enlace real a su detalle; el tema cierra la ruta como texto. */
+  function sessionCrumbs(fallback: string) {
+    const items: { label: string; to?: string }[] = [{ label: "Sesiones", to: "/sesiones" }];
+    if (subject) items.push({ label: subject.title, to: `/carrera/${subject.id}` });
+    if (topic) items.push({ label: topic.title });
+    if (items.length === 1) items.push({ label: fallback });
+    return items;
+  }
+
   if (loading) return <div className="p-10 text-sm text-text-muted">Cargando…</div>;
   if (!session) return <div className="p-10 text-sm text-danger">La sesión no existe.</div>;
 
   if (session.closure_status !== "en_curso") {
     return (
       <div className="mx-auto max-w-2xl p-10">
-        <Breadcrumb
-          items={[{ label: "Sesiones", to: "/sesiones" }, { label: subject?.title ?? topic?.title ?? "Sesión" }]}
-        />
+        <Breadcrumb items={sessionCrumbs("Sesión")} />
         <h1 className="mt-3 font-display text-2xl">{session.observable_objective}</h1>
         <p className="mt-1 text-sm text-text-muted">
           Estado: {session.closure_status} · {session.started_at && new Date(session.started_at).toLocaleString("es-AR")}
@@ -444,9 +454,7 @@ export function ActiveSessionPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-10">
-      <Breadcrumb
-        items={[{ label: "Sesiones", to: "/sesiones" }, { label: subject?.title ?? topic?.title ?? "Sesión activa" }]}
-      />
+      <Breadcrumb items={sessionCrumbs("Sesión activa")} />
       <div>
         <p className="text-xs uppercase tracking-wide text-text-muted">
           {[topic?.title, competency?.title].filter(Boolean).join(" · ") || "Sin ubicar en el mapa"}

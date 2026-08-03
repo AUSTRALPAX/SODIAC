@@ -143,7 +143,10 @@ export function StartSessionPage() {
     try {
       const session = await startSession(currentInput());
       if (taskId) await tasksRepo.update(taskId, { study_session_id: session.id });
-      navigate(`/sesiones/${session.id}`);
+      // `replace`: el formulario ya cumplió su función y la sesión existe.
+      // Dejarlo en el historial haría que Atrás volviera a un formulario que
+      // recrearía una sesión duplicada.
+      navigate(`/sesiones/${session.id}`, { replace: true });
     } finally {
       setStarting(false);
     }
@@ -155,7 +158,7 @@ export function StartSessionPage() {
     try {
       const session = await scheduleSession(currentInput(), new Date(scheduleAt).toISOString());
       if (taskId) await tasksRepo.update(taskId, { study_session_id: session.id });
-      navigate("/sesiones");
+      navigate("/sesiones", { replace: true });
     } finally {
       setScheduling(false);
     }

@@ -362,6 +362,26 @@ export function SettingsPage() {
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          Atajos de teclado
+        </h2>
+        <dl className="mt-3 grid grid-cols-[200px_1fr] gap-y-2 rounded border border-border-subtle bg-surface p-4 text-sm">
+          <dt className="text-text-muted">Ctrl + K</dt>
+          <dd className="text-text-secondary">Abrir la búsqueda global</dd>
+          <dt className="text-text-muted">Alt + ←</dt>
+          <dd className="text-text-secondary">Volver a la pantalla anterior</dd>
+          <dt className="text-text-muted">Alt + →</dt>
+          <dd className="text-text-secondary">Avanzar a la pantalla siguiente</dd>
+          <dt className="text-text-muted">Botones 4 y 5 del mouse</dt>
+          <dd className="text-text-secondary">Volver y avanzar</dd>
+        </dl>
+        <p className="mt-2 text-xs text-text-muted">
+          Volver y avanzar recorren el orden real en que se visitaron las pantallas, a diferencia de
+          la ruta jerárquica que muestran los enlaces de contexto arriba de cada sección.
+        </p>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
           Estado del sistema
         </h2>
         <dl className="mt-3 grid grid-cols-[160px_1fr] gap-y-2 rounded border border-border-subtle bg-surface p-4 text-sm">
