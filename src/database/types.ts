@@ -830,3 +830,28 @@ export interface EvaluationImportRow {
   resulting_evaluation_id: string | null;
   imported_at: string;
 }
+
+/** Motivos por los que se puede revertir una finalización. Espeja el CHECK de
+ * `completion_reversal.reason_code` en la migración 0019. */
+export type CompletionReversalReason =
+  | "sesion_prueba"
+  | "marcado_por_error"
+  | "contenido_no_estudiado"
+  | "evidencia_insuficiente"
+  | "otro";
+
+export interface CompletionReversalRow {
+  id: string;
+  entity_type: "topic" | "subject";
+  entity_id: string;
+  completed_at_before: string | null;
+  status_before: string | null;
+  reason_code: CompletionReversalReason;
+  user_note: string | null;
+  original_xp_event_id: string | null;
+  reversal_xp_event_id: string | null;
+  study_session_id: string | null;
+  purged_level_history: number;
+  reverted_at: string;
+  created_at: string;
+}

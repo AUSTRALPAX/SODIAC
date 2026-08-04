@@ -1,3 +1,4 @@
+import { getDb } from "@/database/client";
 import {
   academicLevelHistoryRepo,
   subjectsRepo,
@@ -185,19 +186,55 @@ export interface PreviewXpResult {
   diff: number;
 }
 
+/** `_` y `%` son comodines de LIKE y las categorías los contienen
+ * (`finalizacion_tema`), así que hay que escaparlos o la familia matchearía de
+ * más. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/**
+ * Todos los eventos de una misma clave base: la original, los reintentos
+ * (`:rev{N}`) y las reversiones (`:reversal:{id}`).
+ *
+ * La búsqueda es por familia y no por igualdad exacta a propósito. Si sólo
+ * mirara la clave exacta, un evento de reversión no entraría en la suma y
+ * `awardXp` vería el XP original como ya otorgado: al re-completar un tema
+ * revertido, `diff` daría 0 y nunca se podría volver a ganar ese XP. Con la
+ * familia, la reversión netea a cero y una re-finalización otorga el monto
+ * completo con una clave nueva.
+ */
+export function idempotencyFamilyClause(baseKey: string): { where: string; params: string[] } {
+  return {
+    where: "idempotency_key = ? OR idempotency_key LIKE ? ESCAPE '\\'",
+    params: [baseKey, `${escapeLike(baseKey)}:%`],
+  };
+}
+
+/** Clave base de una finalización, sin sufijos de reintento ni de reversión. */
+export function baseIdempotencyKey(
+  sourceType: string,
+  sourceId: string,
+  category: XpCategory,
+  rubricVersionId?: string | null,
+): string {
+  return `${sourceType}:${sourceId}:${category}:${rubricVersionId ?? "sin_rubrica"}`;
+}
+
 async function computeXpPreview(input: AwardXpInput): Promise<{
   idempotencyKey: string;
   existingForKey: XpEventRow[];
   alreadyAwardedForKey: number;
   proposedAmount: number;
 }> {
-  const version = input.rubricVersionId ?? "sin_rubrica";
-  const idempotencyKey = `${input.sourceType}:${input.sourceId}:${input.category}:${version}`;
+  const idempotencyKey = baseIdempotencyKey(
+    input.sourceType,
+    input.sourceId,
+    input.category,
+    input.rubricVersionId,
+  );
 
-  const existingForKey = await xpEventsRepo.list({
-    where: "idempotency_key = ?",
-    params: [idempotencyKey],
-  });
+  const existingForKey = await xpEventsRepo.list(idempotencyFamilyClause(idempotencyKey));
   const alreadyAwardedForKey = existingForKey.reduce((sum, e) => sum + e.amount, 0);
 
   let proposedAmount = 0;
@@ -239,8 +276,14 @@ export async function awardXp(input: AwardXpInput): Promise<AwardXpResult> {
     return { event: null, awardedAmount: 0, alreadyAwardedForKey };
   }
 
-  // Reintento con la MISMA clave: usar un id secuencial adicional para no violar la unicidad.
-  const finalKey = existingForKey.length > 0 ? `${idempotencyKey}:rev${existingForKey.length}` : idempotencyKey;
+  // Reintento con la MISMA clave: usar un id secuencial adicional para no violar
+  // la unicidad. La familia sólo crece, así que el contador nunca se repite; aun
+  // así se verifica, porque una colisión rompería el INSERT por el UNIQUE.
+  let finalKey = existingForKey.length > 0 ? `${idempotencyKey}:rev${existingForKey.length}` : idempotencyKey;
+  const usedKeys = new Set(existingForKey.map((e) => e.idempotency_key));
+  for (let n = existingForKey.length; usedKeys.has(finalKey); n++) {
+    finalKey = `${idempotencyKey}:rev${n + 1}`;
+  }
 
   const xpRulesVersion = await ensureCurrentXpRulesVersion();
 
@@ -360,6 +403,89 @@ async function checkAndRecordLevelUp(): Promise<void> {
       });
     }
   }
+}
+
+/**
+ * Tras una reversión el XP baja, y `academic_level_history` sólo registra
+ * máximos (`level > highestRecorded`). Si quedan filas por encima del nivel
+ * real, ese nivel **nunca se volvería a registrar** al recuperarlo — es
+ * exactamente el bug que ya se corrigió en la Fase 3 con las filas de semilla.
+ *
+ * Borrar esas filas es la única excepción deliberada al principio de "no borrar
+ * historial", con la misma justificación que `academicLevelHistoryCleanup.ts`:
+ * una fila que afirma un nivel que no se alcanzó no es historia, es un dato
+ * falso que además bloquea el registro futuro. Queda asentado en
+ * `completion_reversal.purged_level_history`.
+ */
+export async function pruneLevelHistoryAboveCurrent(): Promise<number> {
+  const { level } = await getLevelProgress();
+  const above = await academicLevelHistoryRepo.list({
+    where: "level > ?",
+    params: [level],
+  });
+  if (above.length === 0) return 0;
+  const db = await getDb();
+  await db.execute("DELETE FROM academic_level_history WHERE level > ?", [level]);
+  return above.length;
+}
+
+/**
+ * Evento compensatorio por una finalización revertida.
+ *
+ * `awardXp()` no sirve para esto por diseño: rechaza montos no positivos
+ * (`if (diff <= 0) return`), porque el XP ganado no se resta cuando el dominio
+ * baja. Revertir es otra cosa — es declarar que la finalización nunca debió
+ * contar.
+ *
+ * El evento original **no se borra ni se modifica**. Se inserta uno nuevo con
+ * el monto en negativo y `reversal_of` apuntando al original, de modo que el
+ * historial conserva las dos cosas: que se otorgó y que se revirtió.
+ *
+ * La clave `${claveDelOriginal}:reversal:${idDelOriginal}` cumple dos funciones:
+ * pertenece a la familia de la clave base (así la suma de `awardXp` la ve y el
+ * XP netea a cero), y su UNIQUE **impide por sí solo una segunda reversión del
+ * mismo evento** sin necesidad de chequeo previo.
+ */
+export async function reverseXp(
+  original: XpEventRow,
+  reason: string,
+  metadata?: Record<string, unknown>,
+): Promise<XpEventRow> {
+  const xpRulesVersion = await ensureCurrentXpRulesVersion();
+
+  const event: XpEventRow = {
+    id: crypto.randomUUID(),
+    date: now(),
+    amount: -original.amount,
+    source_type: original.source_type,
+    source_id: original.source_id,
+    subject_id: original.subject_id,
+    // Se reusa la categoría del original: `category` tiene CHECK y no admite
+    // un valor "reversion". El signo del monto es lo que distingue.
+    category: original.category,
+    reason,
+    score: null,
+    multiplier: null,
+    rubric_version_id: original.rubric_version_id,
+    idempotency_key: `${original.idempotency_key}:reversal:${original.id}`,
+    reversal_of: original.id,
+    created_at: now(),
+    metadata_json: metadata ? JSON.stringify(metadata) : null,
+    xp_rules_version_id: xpRulesVersion.id,
+  };
+  await xpEventsRepo.insert(event);
+  return event;
+}
+
+/** Eventos de XP de una finalización concreta, incluidos reintentos y reversiones. */
+export async function listXpEventsForCompletion(
+  sourceType: string,
+  sourceId: string,
+  category: XpCategory,
+  rubricVersionId?: string | null,
+): Promise<XpEventRow[]> {
+  const base = baseIdempotencyKey(sourceType, sourceId, category, rubricVersionId);
+  return xpEventsRepo.list(idempotencyFamilyClause(base));
 }
 
 export async function getLevelHistory() {

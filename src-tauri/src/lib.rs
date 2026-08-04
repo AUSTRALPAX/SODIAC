@@ -150,6 +150,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../../migrations/0018_mastery_external_score.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 19,
+            description: "completion_reversal",
+            sql: include_str!("../../migrations/0019_completion_reversal.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

@@ -137,6 +137,7 @@ export function ActiveSessionPage() {
   const [subjectXpPreview, setSubjectXpPreview] = useState(0);
   const [completeTaskChecked, setCompleteTaskChecked] = useState(false);
   const [completeTopicChecked, setCompleteTopicChecked] = useState(false);
+  const [confirmingClose, setConfirmingClose] = useState(false);
   const [completeSubjectChecked, setCompleteSubjectChecked] = useState(false);
 
   const load = useCallback(async () => {
@@ -199,6 +200,7 @@ export function ActiveSessionPage() {
     setEvidenceSummary(session.evidence_summary ?? "");
     setNextAction(session.next_action ?? "");
     setContinuityPoint(session.continuity_point ?? "");
+    setConfirmingClose(false);
     setShowFinalize(true);
     navigate(location.pathname, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -312,8 +314,24 @@ export function ActiveSessionPage() {
     setComprobarResponse("");
   }
 
-  async function handleFinalize(e: FormEvent) {
+  /**
+   * Decisión del usuario: el checkbox "Tema" sigue tildado por defecto (cómodo
+   * para el caso normal), pero cerrar con Tema o Materia tildados exige un
+   * segundo clic explícito de confirmación — a propósito distinto del punto 17
+   * del pedido original, que pedía destildar el checkbox. Tareas menores no lo
+   * necesitan: sólo completar tema/materia es lo que se revierte con este
+   * asistente si se hace por error.
+   */
+  function handleFinalizeSubmit(e: FormEvent) {
     e.preventDefault();
+    if ((completeTopicChecked || completeSubjectChecked) && !confirmingClose) {
+      setConfirmingClose(true);
+      return;
+    }
+    void handleFinalize();
+  }
+
+  async function handleFinalize() {
     if (!session) return;
     setFinalizeError(null);
     setFinalizing(true);
@@ -591,6 +609,7 @@ export function ActiveSessionPage() {
             setEvidenceSummary(session.evidence_summary ?? "");
             setNextAction(session.next_action ?? "");
             setContinuityPoint(session.continuity_point ?? "");
+            setConfirmingClose(false);
             setShowFinalize(true);
           }}
           className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent"
@@ -668,7 +687,7 @@ export function ActiveSessionPage() {
 
       {showFinalize && (
         <Modal onClose={() => setShowFinalize(false)} title="Finalizar estudio">
-          <form onSubmit={handleFinalize} className="space-y-3">
+          <form onSubmit={handleFinalizeSubmit} className="space-y-3">
             <Field label="Conclusión *" required>
               <textarea value={conclusion} onChange={(e) => setConclusion(e.target.value)} rows={2} className={inputClass} required />
             </Field>
@@ -713,7 +732,10 @@ export function ActiveSessionPage() {
                       <input
                         type="checkbox"
                         checked={completeTopicChecked}
-                        onChange={(e) => setCompleteTopicChecked(e.target.checked)}
+                        onChange={(e) => {
+                          setCompleteTopicChecked(e.target.checked);
+                          setConfirmingClose(false);
+                        }}
                       />
                       Tema: {topic.title}
                     </span>
@@ -729,7 +751,10 @@ export function ActiveSessionPage() {
                         type="checkbox"
                         checked={completeSubjectChecked}
                         disabled={!subjectGate?.eligible}
-                        onChange={(e) => setCompleteSubjectChecked(e.target.checked)}
+                        onChange={(e) => {
+                          setCompleteSubjectChecked(e.target.checked);
+                          setConfirmingClose(false);
+                        }}
                       />
                       Materia: {subject.title}
                     </span>
@@ -810,6 +835,20 @@ export function ActiveSessionPage() {
               </Field>
             )}
 
+            {confirmingClose && (
+              <div className="rounded border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+                <p className="font-semibold uppercase tracking-wide">Confirmá antes de cerrar</p>
+                <p className="mt-1">
+                  Esta sesión va a marcar como completado:{" "}
+                  {[completeTopicChecked && topic?.title, completeSubjectChecked && subject?.title]
+                    .filter(Boolean)
+                    .join(" y ")}
+                  . Si fue por error, se puede corregir después desde "Corregir estado" en Carrera — pero conviene
+                  revisar ahora.
+                </p>
+              </div>
+            )}
+
             {finalizeError && <p className="text-xs text-danger">{finalizeError}</p>}
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-text-muted">
@@ -818,13 +857,24 @@ export function ActiveSessionPage() {
                   `Guardado${draftSavedAt ? ` · ${draftSavedAt.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
                 {draftStatus === "error" && <span className="text-danger">Error al guardar el borrador</span>}
               </p>
-              <button
-                type="submit"
-                disabled={finalizing}
-                className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent disabled:opacity-40"
-              >
-                {finalizing ? "Cerrando…" : "Cerrar sesión"}
-              </button>
+              <span className="flex gap-2">
+                {confirmingClose && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingClose(false)}
+                    className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent"
+                  >
+                    Revisar
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={finalizing}
+                  className="rounded border border-accent bg-accent/10 px-4 py-2 text-sm font-medium uppercase tracking-wide text-accent disabled:opacity-40"
+                >
+                  {finalizing ? "Cerrando…" : confirmingClose ? "Confirmar y cerrar" : "Cerrar sesión"}
+                </button>
+              </span>
             </div>
           </form>
         </Modal>

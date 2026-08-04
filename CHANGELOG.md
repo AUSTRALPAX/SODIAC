@@ -2,6 +2,90 @@
 
 Formato basado en Keep a Changelog. Versión de la app en `package.json` / `src-tauri/tauri.conf.json`.
 
+## [1.19.0] — Reversión segura de completados (Entrega 2)
+
+Segunda y última entrega del pedido de navegación + reversión. Requiere
+migración (`0019_completion_reversal.sql`) y se hizo con backup manual
+verificado (checksum SHA-256 sobre la copia) antes de tocar el esquema.
+
+### "Marcar como no completado"
+
+- Nuevo asistente (`ReversalWizard.tsx`), accesible desde un enlace discreto
+  "Corregir estado" — nunca un botón junto a "Iniciar estudio" — en
+  Cronograma Maestro, Temario y el detalle de materia. Antes, ninguna de
+  las tres vistas ofrecía control alguno sobre un tema ya completado.
+- Muestra fecha de finalización, sesión relacionada, XP a compensar, y qué
+  temas volverán a verse "bloqueados" (con aviso de cuáles ya tienen
+  actividad propia) antes de pedir motivo y confirmar.
+- **Nada se borra.** El `xp_event` original queda intacto; la reversión
+  agrega un evento compensatorio negativo con `reversal_of` apuntando al
+  original. El tema/materia vuelve a `completed_at = NULL`, pero
+  `activity_log` ya registra ese cambio por sí solo.
+- Si la materia ya está cerrada, revertir un tema exige confirmar también
+  la reversión del cierre de la materia — no hay una tercera opción
+  silenciosa que la deje inconsistente.
+
+### El problema de fondo: la clave de idempotencia
+
+`awardXp()` calculaba cuánto XP ya se había otorgado buscando por
+**igualdad exacta** de clave. Sin cambiarlo, una reversión quedaría fuera
+de esa cuenta y re-completar el mismo tema después nunca volvería a
+otorgar XP. La búsqueda pasa a ser por **familia completa** de claves
+(original + reintentos + reversión), con lo que revertir netea el XP a
+cero y volver a completar otorga el monto entero con una clave nueva. El
+`UNIQUE` de la base impide por sí solo una segunda reversión del mismo
+evento.
+
+Un detalle que casi pasa desapercibido: las categorías de XP contienen
+`_` (`finalizacion_tema`), que es comodín de `LIKE`. La búsqueda por
+familia escapa la clave y usa `ESCAPE` — sin eso, sumaría XP de una
+categoría distinta por simple coincidencia de patrón.
+
+### `academic_level_history`
+
+Es la única excepción al "nada se borra": esa tabla sólo registra máximos
+y nunca se actualiza a la baja, así que si una reversión baja el nivel,
+las filas por encima del nivel real impedirían volver a registrarlo al
+recuperarlo — el mismo bug que ya se había corregido para las filas de
+semilla. La reversión purga esas filas y deja asentado cuántas en
+`completion_reversal.purged_level_history`.
+
+### Prevención
+
+- Cerrar una sesión con el checkbox "Tema" o "Materia" tildado ahora
+  exige un segundo clic de confirmación, mostrando qué se va a marcar
+  como completado antes de escribir nada. El checkbox sigue tildado por
+  defecto — cómodo para el caso normal — pero ya no alcanza con un solo
+  clic para completar algo por accidente.
+- En Cronograma Maestro, "Marcar como completado" —que hasta ahora
+  completaba con un solo clic, sin preview ni confirmación, el peor caso
+  del pedido— ahora muestra el XP a otorgar y pide confirmar.
+
+### Historial de estado
+
+Nueva pestaña en Carrera que lista todas las reversiones: qué se corrigió,
+cuándo, por qué motivo, y si hubo XP compensado o ajuste del historial de
+nivel.
+
+### Corregido de paso: Carrera quedaba pegada a la pestaña del deep-link
+
+Al llegar a Carrera con `?tab=...` (el mismo mecanismo que usa "Abrir en
+Cronograma Maestro" desde el Mapa), el parámetro de la URL nunca se
+limpiaba y se leía en cada render — así que un clic posterior en
+cualquier otra pestaña actualizaba la preferencia guardada sin que se
+notara, porque `view` seguía leyendo el parámetro viejo. El deep-link
+ahora se aplica una sola vez, al llegar.
+
+El primer intento de arreglo tenía una condición de carrera: aplicar el
+override apenas monta el componente no alcanza, porque
+`useViewPreference` arranca en sus valores por defecto y los reemplaza en
+cuanto resuelve la lectura asíncrona de la preferencia guardada — si esa
+carga resolvía después del override, lo pisaba con lo que hubiera
+quedado de la sesión anterior. El override ahora espera a que la carga
+termine (`viewPrefsLoaded`) antes de aplicarse. Lo encontró la
+verificación en vivo de la Entrega 2, en dos corridas, al probar la
+pestaña nueva de Historial de estado.
+
 ## [1.18.0] — Navegación Atrás/Adelante (Entrega 1)
 
 Primera de dos entregas. Esta no toca la base de datos ni el historial

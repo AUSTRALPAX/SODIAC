@@ -16,9 +16,10 @@ import {
   topicFundamentalQuestionsRepo,
 } from "@/database/entities";
 import { openNoteInObsidian } from "@/services/obsidian";
-import { completeTopic } from "@/services/completionXp";
+import { completeTopic, previewTopicCompletion } from "@/services/completionXp";
 import { scheduleSession } from "@/services/sessions";
 import { buildMasterSchedule, type MasterSchedule, type ScheduleStep, type ScheduleStepStatus } from "@/services/masterSchedule";
+import { ReversalWizard } from "./ReversalWizard";
 import type { CareerData } from "./useCareerData";
 
 const STATUS_LABEL: Record<ScheduleStepStatus, string> = {
@@ -54,6 +55,10 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
   const collapsedSubjects = useMemo(() => new Set(viewPrefs.collapsedSubjectIds), [viewPrefs.collapsedSubjectIds]);
   const [schedulingStep, setSchedulingStep] = useState<ScheduleStep | null>(null);
   const [scheduleDate, setScheduleDate] = useState("");
+  const [confirmingStep, setConfirmingStep] = useState<ScheduleStep | null>(null);
+  const [confirmXp, setConfirmXp] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [reversalTopicId, setReversalTopicId] = useState<string | null>(null);
 
   // ?buscar= desde "Ver bibliografía" del Mapa/Cronograma — prioriza el
   // valor que trae la URL sobre la preferencia guardada, y lo persiste.
@@ -114,9 +119,26 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
     return map;
   }, [filteredSteps]);
 
-  async function handleComplete(step: ScheduleStep) {
-    await completeTopic(step.topic.id);
-    await load();
+  // Hasta ahora este era el peor caso del pedido: un solo clic completaba el
+  // tema sin preview ni confirmación. Ahora muestra el XP a otorgar antes de
+  // escribir nada.
+  async function handleRequestComplete(step: ScheduleStep) {
+    setConfirmingStep(step);
+    setConfirmXp(null);
+    const preview = await previewTopicCompletion(step.topic);
+    setConfirmXp(preview.amount);
+  }
+
+  async function handleConfirmComplete() {
+    if (!confirmingStep) return;
+    setConfirming(true);
+    try {
+      await completeTopic(confirmingStep.topic.id);
+      setConfirmingStep(null);
+      await load();
+    } finally {
+      setConfirming(false);
+    }
   }
 
   async function handleOpenNotes(step: ScheduleStep) {
@@ -239,13 +261,14 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
                   { immediate: true },
                 )
               }
-              onComplete={() => void handleComplete(step)}
+              onComplete={() => void handleRequestComplete(step)}
               onStartSession={() => handleStartSession(step)}
               onOpenSubject={() => navigate(`/carrera/${step.subject.id}`)}
               onOpenNotes={() => void handleOpenNotes(step)}
               onOpenMap={() => navigate(`/mapa?buscar=${encodeURIComponent(step.topic.title)}`)}
               onOpenBibliography={() => navigate(`/biblioteca?tema=${step.topic.id}`)}
               onSchedule={() => setSchedulingStep(step)}
+              onCorrectState={() => setReversalTopicId(step.topic.id)}
             />
           ))}
 
@@ -282,13 +305,14 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
                             { immediate: true },
                           )
                         }
-                        onComplete={() => void handleComplete(step)}
+                        onComplete={() => void handleRequestComplete(step)}
                         onStartSession={() => handleStartSession(step)}
                         onOpenSubject={() => navigate(`/carrera/${step.subject.id}`)}
                         onOpenNotes={() => void handleOpenNotes(step)}
                         onOpenMap={() => navigate(`/mapa?buscar=${encodeURIComponent(step.topic.title)}`)}
                         onOpenBibliography={() => navigate(`/biblioteca?tema=${step.topic.id}`)}
                         onSchedule={() => setSchedulingStep(step)}
+                        onCorrectState={() => setReversalTopicId(step.topic.id)}
                         hideSubjectLabel
                       />
                     ))}
@@ -339,6 +363,53 @@ export function MasterScheduleView({ data, initialSearch }: { data: CareerData; 
           </div>
         </div>
       )}
+
+      {confirmingStep && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-8"
+          onClick={() => !confirming && setConfirmingStep(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded border border-border bg-surface-elevated p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-display text-lg">Marcar como completado</h3>
+            <p className="mt-1 text-xs text-text-muted">
+              {confirmingStep.topic.title} · {confirmingStep.subject.title}
+            </p>
+            <p className="mt-2 text-sm text-accent">
+              {confirmXp == null ? "Calculando XP…" : `+${Math.round(confirmXp)} XP`}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => void handleConfirmComplete()}
+                disabled={confirming || confirmXp == null}
+                className="rounded border border-success bg-success/10 px-4 py-2 text-sm uppercase tracking-wide text-success disabled:opacity-40"
+              >
+                {confirming ? "Marcando…" : "Confirmar"}
+              </button>
+              <button
+                onClick={() => setConfirmingStep(null)}
+                disabled={confirming}
+                className="rounded border border-border px-4 py-2 text-sm text-text-secondary hover:border-accent hover:text-accent"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reversalTopicId && (
+        <ReversalWizard
+          topicId={reversalTopicId}
+          onClose={() => setReversalTopicId(null)}
+          onReverted={() => {
+            setReversalTopicId(null);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -365,6 +436,7 @@ function ScheduleRow({
   onOpenMap,
   onOpenBibliography,
   onSchedule,
+  onCorrectState,
 }: {
   step: ScheduleStep;
   density: Density;
@@ -378,6 +450,7 @@ function ScheduleRow({
   onOpenMap: () => void;
   onOpenBibliography: () => void;
   onSchedule: () => void;
+  onCorrectState: () => void;
 }) {
   const isDone = step.status === "completado";
   return (
@@ -479,6 +552,14 @@ function ScheduleRow({
                 className="rounded border border-success px-2 py-1 text-[11px] uppercase tracking-wide text-success"
               >
                 Marcar como completado
+              </button>
+            )}
+            {isDone && (
+              <button
+                onClick={onCorrectState}
+                className="text-[11px] text-text-muted underline decoration-dotted hover:text-danger"
+              >
+                Corregir estado
               </button>
             )}
           </div>

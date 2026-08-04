@@ -4,6 +4,7 @@ import { computeTopicLearningState } from "@/services/learningState";
 import { TopicStateBadge } from "@/components/TopicStateBadge";
 import { ValidationPanel } from "./ValidationPanel";
 import { KnowledgeHistoryPanel } from "./KnowledgeHistoryPanel";
+import { ReversalWizard } from "./ReversalWizard";
 import type { TopicRow } from "@/database/types";
 import type { CareerData } from "./useCareerData";
 
@@ -81,9 +82,11 @@ function TopicList({
 }) {
   const [validatingTopicId, setValidatingTopicId] = useState<string | null>(null);
   const [historyTopicId, setHistoryTopicId] = useState<string | null>(null);
+  const [reversalTopicId, setReversalTopicId] = useState<string | null>(null);
 
   return (
-    <ul className="divide-y divide-border-subtle border-t border-border-subtle">
+    <>
+      <ul className="divide-y divide-border-subtle border-t border-border-subtle">
       {topics.map((topic) => {
         const topicActivities = activities.filter((a) => a.topic_id === topic.id);
         return (
@@ -107,6 +110,16 @@ function TopicList({
                   state={computeTopicLearningState({ completedAt: topic.completed_at, ...learningSignals.get(topic.id) })}
                 />
                 {!topic.completed_at && <TopicCompleteControl topic={topic} onReload={onReload} />}
+                {/* "Corregir estado" nunca es una acción principal — texto discreto,
+                    no un botón junto a "Marcar completado". */}
+                {topic.completed_at && (
+                  <button
+                    onClick={() => setReversalTopicId(topic.id)}
+                    className="text-xs text-text-muted underline decoration-dotted hover:text-danger"
+                  >
+                    Corregir estado
+                  </button>
+                )}
               </div>
             </div>
             {topicActivities.length > 0 && (
@@ -140,7 +153,18 @@ function TopicList({
         );
       })}
       {topics.length === 0 && <li className="px-3 py-2 text-xs text-text-muted">Sin temas todavía.</li>}
-    </ul>
+      </ul>
+      {reversalTopicId && (
+        <ReversalWizard
+          topicId={reversalTopicId}
+          onClose={() => setReversalTopicId(null)}
+          onReverted={() => {
+            setReversalTopicId(null);
+            onReload();
+          }}
+        />
+      )}
+    </>
   );
 }
 

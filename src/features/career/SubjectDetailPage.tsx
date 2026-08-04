@@ -47,6 +47,7 @@ import { getSubjectXpBudgetTotal, getSubjectXpTotal } from "@/services/xp";
 import { KnowledgeHistoryPanel } from "./KnowledgeHistoryPanel";
 import { computeTopicLearningState, loadTopicLearningSignals, type TopicLearningSignals } from "@/services/learningState";
 import { TopicStateBadge } from "@/components/TopicStateBadge";
+import { ReversalWizard } from "./ReversalWizard";
 import {
   checkSubjectCompletionGate,
   completeSubject,
@@ -78,6 +79,7 @@ export function SubjectDetailPage() {
   const [detail, setDetail] = useState<SubjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [gate, setGate] = useState<SubjectCompletionGate | null>(null);
+  const [reversalTopicId, setReversalTopicId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!subjectId) return;
@@ -214,6 +216,14 @@ export function SubjectDetailPage() {
                           state={computeTopicLearningState({ completedAt: t.completed_at, ...learningSignals.get(t.id) })}
                         />
                         {!t.completed_at && <TopicCompleteInline topic={t} onReload={load} />}
+                        {t.completed_at && (
+                          <button
+                            onClick={() => setReversalTopicId(t.id)}
+                            className="text-text-muted underline decoration-dotted hover:text-danger"
+                          >
+                            Corregir estado
+                          </button>
+                        )}
                       </span>
                     </li>
                   ))}
@@ -234,6 +244,14 @@ export function SubjectDetailPage() {
                           state={computeTopicLearningState({ completedAt: t.completed_at, ...learningSignals.get(t.id) })}
                         />
                         {!t.completed_at && <TopicCompleteInline topic={t} onReload={load} />}
+                        {t.completed_at && (
+                          <button
+                            onClick={() => setReversalTopicId(t.id)}
+                            className="text-text-muted underline decoration-dotted hover:text-danger"
+                          >
+                            Corregir estado
+                          </button>
+                        )}
                       </span>
                     </li>
                   ))}
@@ -314,6 +332,17 @@ export function SubjectDetailPage() {
           <KnowledgeHistoryPanel subjectId={subject.id} />
         </div>
       </section>
+
+      {reversalTopicId && (
+        <ReversalWizard
+          topicId={reversalTopicId}
+          onClose={() => setReversalTopicId(null)}
+          onReverted={() => {
+            setReversalTopicId(null);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
